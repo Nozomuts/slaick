@@ -10,3 +10,11 @@ export type OpenRouterResponse = {
     };
   }>;
 };
+
+export type SummaryVisibility = "public" | "private";
+
+export type SummaryData = {
+  channelId: string;
+  threadTs: string;
+  summary: string;
+};

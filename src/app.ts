@@ -11,7 +11,7 @@ const app = new App({
 });
 
 // スラッシュコマンドハンドラ
-app.command("/summarize", async ({ command, ack, respond, client }) => {
+app.command("/summarize", async ({ command, ack, respond, client, body }) => {
   await ack();
 
   try {
@@ -31,8 +31,43 @@ app.command("/summarize", async ({ command, ack, respond, client }) => {
     // OpenRouterでスレッドを要約
     const summary = await summarizeThread(threadText);
 
-    // 要約をスレッドに投稿
-    await postSummaryToThread(client, channelId, threadTs, summary);
+    // ユーザーID取得
+    const userId = body.user_id;
+
+    // まず非公開で要約結果を表示
+    await postSummaryToThread(client, channelId, threadTs, summary, "private");
+
+    // 公開するボタン付きの通知
+    await respond({
+      text: "📝 スレッドの要約が完了しました（あなただけに表示されています）",
+      response_type: "ephemeral",
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "📝 *スレッド要約が完了しました*\n\n要約結果はあなただけに表示されています。スレッドに公開することもできます。",
+          },
+        },
+        {
+          type: "actions",
+          block_id: "summary_visibility",
+          elements: [
+            {
+              type: "button",
+              text: {
+                type: "plain_text",
+                text: "スレッドに公開する",
+                emoji: true,
+              },
+              style: "primary",
+              value: `${channelId}:${threadTs}:${encodeURIComponent(summary)}`,
+              action_id: "publish_summary_to_thread",
+            },
+          ],
+        },
+      ],
+    });
   } catch (error) {
     console.error("要約処理エラー:", error);
     await respond({
@@ -41,6 +76,48 @@ app.command("/summarize", async ({ command, ack, respond, client }) => {
       }`,
       response_type: "ephemeral",
     });
+  }
+});
+
+// 公開要約ボタンのアクションハンドラ
+app.action("publish_summary_to_thread", async ({ ack, body, client }) => {
+  await ack();
+
+  try {
+    // @ts-ignore - bodyの型定義を簡略化
+    const value = body.actions?.[0]?.value;
+
+    if (!value) {
+      throw new Error("要約データが見つかりません");
+    }
+
+    // 値からチャンネルID、スレッドTS、要約テキストを取得
+    const [channelId, threadTs, encodedSummary] = value.split(":");
+    const summary = decodeURIComponent(encodedSummary);
+
+    // スレッドに公開として投稿
+    await postSummaryToThread(client, channelId, threadTs, summary, "public");
+
+    // 確認メッセージを送信
+    // @ts-ignore - bodyの型定義を簡略化
+    await client.chat.update({
+      // @ts-ignore - bodyの型定義を簡略化
+      channel: body.channel?.id,
+      // @ts-ignore - bodyの型定義を簡略化
+      ts: body.message?.ts,
+      text: "✅ 要約をスレッドに公開しました",
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "✅ 要約をスレッドに公開しました",
+          },
+        },
+      ],
+    });
+  } catch (error) {
+    console.error("要約公開エラー:", error);
   }
 });
 
