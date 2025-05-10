@@ -2,6 +2,7 @@ import { App } from "@slack/bolt";
 import * as dotenv from "dotenv";
 import { summarizeThread } from "./utils/openRouter";
 import { getThreadMessages, postSummaryToThread } from "./utils/thread";
+import { exportToNotion } from "./utils/notion";
 
 dotenv.config();
 
@@ -64,6 +65,16 @@ app.command("/summarize", async ({ command, ack, respond, client, body }) => {
               value: `${channelId}:${threadTs}:${encodeURIComponent(summary)}`,
               action_id: "publish_summary_to_thread",
             },
+            {
+              type: "button",
+              text: {
+                type: "plain_text",
+                text: "Notionにエクスポート",
+                emoji: true,
+              },
+              value: `${channelId}:${threadTs}:${encodeURIComponent(summary)}`,
+              action_id: "export_to_notion",
+            },
           ],
         },
       ],
@@ -118,6 +129,117 @@ app.action("publish_summary_to_thread", async ({ ack, body, client }) => {
     });
   } catch (error) {
     console.error("要約公開エラー:", error);
+  }
+});
+
+// Notionへのエクスポートボタンのアクションハンドラ
+app.action("export_to_notion", async ({ ack, body, client, respond }) => {
+  await ack();
+
+  try {
+    // @ts-ignore - bodyの型定義を簡略化
+    const value = body.actions?.[0]?.value;
+
+    if (!value) {
+      throw new Error("要約データが見つかりません");
+    }
+
+    // 値からチャンネルID、スレッドTS、要約テキストを取得
+    const [channelId, threadTs, encodedSummary] = value.split(":");
+    const summary = decodeURIComponent(encodedSummary);
+
+    // チャンネル名を取得（タイトルに使用）
+    const channelInfo = await client.conversations.info({
+      channel: channelId,
+    });
+    const channelName = channelInfo.channel?.name || "チャンネル";
+
+    // スレッドの最初のメッセージを取得してタイトルに使用
+    const threadMessages = await client.conversations.replies({
+      channel: channelId,
+      ts: threadTs,
+      limit: 1,
+    });
+
+    const firstMessageText = threadMessages.messages?.[0]?.text || "";
+    const shortText =
+      firstMessageText.length > 30
+        ? firstMessageText.substring(0, 30) + "..."
+        : firstMessageText;
+
+    // タイトルを作成
+    const title = `${channelName} スレッド要約: ${shortText}`;
+
+    // Notionにエクスポート
+    const result = await exportToNotion(summary, { title });
+
+    if (result.success) {
+      // 成功メッセージ
+      // @ts-ignore - bodyの型定義を簡略化
+      await client.chat.update({
+        // @ts-ignore - bodyの型定義を簡略化
+        channel: body.channel?.id,
+        // @ts-ignore - bodyの型定義を簡略化
+        ts: body.message?.ts,
+        text: "✅ Notionへのエクスポートが完了しました",
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: "✅ Notionへのエクスポートが完了しました",
+            },
+          },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `<${result.url}|Notionで開く>`,
+            },
+          },
+        ],
+      });
+    } else {
+      // エラーメッセージ
+      // @ts-ignore - bodyの型定義を簡略化
+      await client.chat.update({
+        // @ts-ignore - bodyの型定義を簡略化
+        channel: body.channel?.id,
+        // @ts-ignore - bodyの型定義を簡略化
+        ts: body.message?.ts,
+        text: "❌ Notionへのエクスポートに失敗しました",
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `❌ Notionへのエクスポートに失敗しました: ${result.error}`,
+            },
+          },
+        ],
+      });
+    }
+  } catch (error) {
+    console.error("Notionエクスポートエラー:", error);
+    // @ts-ignore - bodyの型定義を簡略化
+    await client.chat.update({
+      // @ts-ignore - bodyの型定義を簡略化
+      channel: body.channel?.id,
+      // @ts-ignore - bodyの型定義を簡略化
+      ts: body.message?.ts,
+      text: "❌ Notionへのエクスポートに失敗しました",
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `❌ Notionへのエクスポートに失敗しました: ${
+              error instanceof Error ? error.message : "不明なエラー"
+            }`,
+          },
+        },
+      ],
+    });
   }
 });
 
