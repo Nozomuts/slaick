@@ -3,6 +3,7 @@ import * as dotenv from "dotenv";
 import { summarizeThread } from "./utils/openRouter";
 import { getThreadMessages, postSummaryToThread } from "./utils/thread";
 import { exportToNotion } from "./utils/notion";
+import { generateMarkdown } from "./utils/markdown";
 
 dotenv.config();
 
@@ -74,6 +75,16 @@ app.command("/summarize", async ({ command, ack, respond, client, body }) => {
               },
               value: `${channelId}:${threadTs}:${encodeURIComponent(summary)}`,
               action_id: "export_to_notion",
+            },
+            {
+              type: "button",
+              text: {
+                type: "plain_text",
+                text: "Markdownで表示",
+                emoji: true,
+              },
+              value: `${channelId}:${threadTs}:${encodeURIComponent(summary)}`,
+              action_id: "show_markdown",
             },
           ],
         },
@@ -240,6 +251,188 @@ app.action("export_to_notion", async ({ ack, body, client, respond }) => {
         },
       ],
     });
+  }
+});
+
+// マークダウン表示ボタンのアクションハンドラ
+app.action("show_markdown", async ({ ack, body, client }) => {
+  await ack();
+
+  try {
+    // @ts-ignore - bodyの型定義を簡略化
+    const value = body.actions?.[0]?.value;
+
+    if (!value) {
+      throw new Error("要約データが見つかりません");
+    }
+
+    // 値からチャンネルID、スレッドTS、要約テキストを取得
+    const [channelId, threadTs, encodedSummary] = value.split(":");
+    const summary = decodeURIComponent(encodedSummary);
+
+    // マークダウンを生成
+    const markdown = await generateMarkdown(
+      client,
+      channelId,
+      threadTs,
+      summary
+    );
+
+    // マークダウンをコードブロックとして表示
+    // @ts-ignore - bodyの型定義を簡略化
+    await client.chat.update({
+      // @ts-ignore - bodyの型定義を簡略化
+      channel: body.channel?.id,
+      // @ts-ignore - bodyの型定義を簡略化
+      ts: body.message?.ts,
+      text: "📝 Markdown形式の要約",
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "📝 *Markdown形式の要約*\n\n以下のテキストをコピーして `.md` ファイルとして保存できます。",
+          },
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "```markdown\n" + markdown + "\n```",
+          },
+        },
+        {
+          type: "actions",
+          block_id: "markdown_actions",
+          elements: [
+            {
+              type: "button",
+              text: {
+                type: "plain_text",
+                text: "元の画面に戻る",
+                emoji: true,
+              },
+              value: `${channelId}:${threadTs}:${encodeURIComponent(summary)}`,
+              action_id: "back_to_summary",
+            },
+          ],
+        },
+      ],
+    });
+  } catch (error) {
+    console.error("Markdown表示エラー:", error);
+    // @ts-ignore - bodyの型定義を簡略化
+    await client.chat.update({
+      // @ts-ignore - bodyの型定義を簡略化
+      channel: body.channel?.id,
+      // @ts-ignore - bodyの型定義を簡略化
+      ts: body.message?.ts,
+      text: "❌ Markdown表示に失敗しました",
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `❌ Markdown表示に失敗しました: ${
+              error instanceof Error ? error.message : "不明なエラー"
+            }`,
+          },
+        },
+        {
+          type: "actions",
+          block_id: "markdown_error_actions",
+          elements: [
+            {
+              type: "button",
+              text: {
+                type: "plain_text",
+                text: "元の画面に戻る",
+                emoji: true,
+              },
+              // @ts-ignore - bodyの型定義を簡略化
+              value: body.actions?.[0]?.value,
+              action_id: "back_to_summary",
+            },
+          ],
+        },
+      ],
+    });
+  }
+});
+
+// 「元の画面に戻る」ボタンのアクションハンドラ
+app.action("back_to_summary", async ({ ack, body, client }) => {
+  await ack();
+
+  try {
+    // @ts-ignore - bodyの型定義を簡略化
+    const value = body.actions?.[0]?.value;
+
+    if (!value) {
+      throw new Error("要約データが見つかりません");
+    }
+
+    // 値からチャンネルID、スレッドTS、要約テキストを取得
+    const [channelId, threadTs, encodedSummary] = value.split(":");
+    const summary = decodeURIComponent(encodedSummary);
+
+    // 元の要約画面に戻す
+    // @ts-ignore - bodyの型定義を簡略化
+    await client.chat.update({
+      // @ts-ignore - bodyの型定義を簡略化
+      channel: body.channel?.id,
+      // @ts-ignore - bodyの型定義を簡略化
+      ts: body.message?.ts,
+      text: "📝 スレッドの要約が完了しました（あなただけに表示されています）",
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "📝 *スレッド要約が完了しました*\n\n要約結果はあなただけに表示されています。スレッドに公開することもできます。",
+          },
+        },
+        {
+          type: "actions",
+          block_id: "summary_visibility",
+          elements: [
+            {
+              type: "button",
+              text: {
+                type: "plain_text",
+                text: "スレッドに公開する",
+                emoji: true,
+              },
+              style: "primary",
+              value: `${channelId}:${threadTs}:${encodedSummary}`,
+              action_id: "publish_summary_to_thread",
+            },
+            {
+              type: "button",
+              text: {
+                type: "plain_text",
+                text: "Notionにエクスポート",
+                emoji: true,
+              },
+              value: `${channelId}:${threadTs}:${encodedSummary}`,
+              action_id: "export_to_notion",
+            },
+            {
+              type: "button",
+              text: {
+                type: "plain_text",
+                text: "Markdownで表示",
+                emoji: true,
+              },
+              value: `${channelId}:${threadTs}:${encodedSummary}`,
+              action_id: "show_markdown",
+            },
+          ],
+        },
+      ],
+    });
+  } catch (error) {
+    console.error("画面復元エラー:", error);
   }
 });
 

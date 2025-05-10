@@ -19,17 +19,18 @@ export type SummaryData = {
   summary: string;
 };
 
-// Notion関連の型定義
+// エクスポート関連の型定義
 export type NotionExportOptions = {
   title?: string;
   databaseId?: string;
   pageId?: string;
 };
 
-export type ExportDestination = "notion" | "clipboard";
+export type ExportDestination = "notion" | "markdown" | "clipboard";
 
 export type ExportResult = {
   success: boolean;
   url?: string;
   error?: string;
+  markdown?: string;
 };
