@@ -19,6 +19,13 @@ export type SummaryData = {
   summary: string;
 };
 
+// チャンネル要約関連の型定義
+export type ChannelSummaryData = {
+  channelId: string;
+  messageCount: number;
+  summary: string;
+};
+
 // エクスポート関連の型定義
 export type NotionExportOptions = {
   title?: string;

@@ -1,9 +1,14 @@
 import { App } from "@slack/bolt";
 import * as dotenv from "dotenv";
 import { summarizeThread } from "./utils/openRouter";
-import { getThreadMessages, postSummaryToThread } from "./utils/thread";
+import {
+  getThreadMessages,
+  getChannelMessages,
+  postSummaryToThread,
+  postChannelSummary,
+} from "./utils/thread";
 import { exportToNotion } from "./utils/notion";
-import { generateMarkdown } from "./utils/markdown";
+import { generateMarkdown, generateChannelMarkdown } from "./utils/markdown";
 
 dotenv.config();
 
@@ -376,63 +381,488 @@ app.action("back_to_summary", async ({ ack, body, client }) => {
     const [channelId, threadTs, encodedSummary] = value.split(":");
     const summary = decodeURIComponent(encodedSummary);
 
-    // 元の要約画面に戻す
+    // threadTsが"channel"で始まる場合はチャンネル要約、そうでなければスレッド要約
+    if (threadTs.startsWith("channel:")) {
+      const messageCount = parseInt(threadTs.replace("channel:", ""));
+
+      // 元のチャンネル要約画面に戻す
+      // @ts-ignore - bodyの型定義を簡略化
+      await client.chat.update({
+        // @ts-ignore - bodyの型定義を簡略化
+        channel: body.channel?.id,
+        // @ts-ignore - bodyの型定義を簡略化
+        ts: body.message?.ts,
+        text: "📝 チャンネルの要約が完了しました（あなただけに表示されています）",
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `📝 *チャンネル要約が完了しました (最新${messageCount}件)*\n\n要約結果はあなただけに表示されています。チャンネルに公開することもできます。`,
+            },
+          },
+          {
+            type: "actions",
+            block_id: "summary_visibility",
+            elements: [
+              {
+                type: "button",
+                text: {
+                  type: "plain_text",
+                  text: "チャンネルに公開する",
+                  emoji: true,
+                },
+                style: "primary",
+                value: `${channelId}:channel:${messageCount}:${encodedSummary}`,
+                action_id: "publish_channel_summary",
+              },
+              {
+                type: "button",
+                text: {
+                  type: "plain_text",
+                  text: "Notionにエクスポート",
+                  emoji: true,
+                },
+                value: `${channelId}:channel:${messageCount}:${encodedSummary}`,
+                action_id: "export_channel_to_notion",
+              },
+              {
+                type: "button",
+                text: {
+                  type: "plain_text",
+                  text: "Markdownで表示",
+                  emoji: true,
+                },
+                value: `${channelId}:channel:${messageCount}:${encodedSummary}`,
+                action_id: "show_channel_markdown",
+              },
+            ],
+          },
+        ],
+      });
+    } else {
+      // 元のスレッド要約画面に戻す
+      // @ts-ignore - bodyの型定義を簡略化
+      await client.chat.update({
+        // @ts-ignore - bodyの型定義を簡略化
+        channel: body.channel?.id,
+        // @ts-ignore - bodyの型定義を簡略化
+        ts: body.message?.ts,
+        text: "📝 スレッドの要約が完了しました（あなただけに表示されています）",
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: "📝 *スレッド要約が完了しました*\n\n要約結果はあなただけに表示されています。スレッドに公開することもできます。",
+            },
+          },
+          {
+            type: "actions",
+            block_id: "summary_visibility",
+            elements: [
+              {
+                type: "button",
+                text: {
+                  type: "plain_text",
+                  text: "スレッドに公開する",
+                  emoji: true,
+                },
+                style: "primary",
+                value: `${channelId}:${threadTs}:${encodedSummary}`,
+                action_id: "publish_summary_to_thread",
+              },
+              {
+                type: "button",
+                text: {
+                  type: "plain_text",
+                  text: "Notionにエクスポート",
+                  emoji: true,
+                },
+                value: `${channelId}:${threadTs}:${encodedSummary}`,
+                action_id: "export_to_notion",
+              },
+              {
+                type: "button",
+                text: {
+                  type: "plain_text",
+                  text: "Markdownで表示",
+                  emoji: true,
+                },
+                value: `${channelId}:${threadTs}:${encodedSummary}`,
+                action_id: "show_markdown",
+              },
+            ],
+          },
+        ],
+      });
+    }
+  } catch (error) {
+    console.error("画面復元エラー:", error);
+  }
+});
+
+// チャンネル要約コマンド
+app.command(
+  "/summarize-channel",
+  async ({ command, ack, respond, client, body }) => {
+    await ack();
+
+    try {
+      // エフェメラルメッセージで処理中を通知
+      await respond({
+        text: "📝 チャンネルの要約を作成しています...",
+        response_type: "ephemeral",
+      });
+
+      const channelId = command.channel_id;
+
+      // コマンド引数からメッセージ数を取得（引数がない場合はデフォルト100件）
+      let messageCount = 100;
+      if (command.text) {
+        const parsedCount = parseInt(command.text);
+        if (!isNaN(parsedCount) && parsedCount > 0) {
+          messageCount = Math.min(parsedCount, 1000); // 最大1000件に制限
+        }
+      }
+
+      // チャンネルのメッセージを取得
+      const channelText = await getChannelMessages(
+        client,
+        channelId,
+        messageCount
+      );
+
+      // OpenRouterでチャンネルを要約
+      const summary = await summarizeThread(channelText);
+
+      // ユーザーID取得
+      const userId = body.user_id;
+
+      // 公開するボタン付きの通知
+      await respond({
+        text: `📝 チャンネルの要約が完了しました (最新${messageCount}件)（あなただけに表示されています）`,
+        response_type: "ephemeral",
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `📝 *チャンネル要約が完了しました (最新${messageCount}件)*\n\n${summary}\n\n要約結果はあなただけに表示されています。チャンネルに公開することもできます。`,
+            },
+          },
+          {
+            type: "actions",
+            block_id: "summary_visibility",
+            elements: [
+              {
+                type: "button",
+                text: {
+                  type: "plain_text",
+                  text: "チャンネルに公開する",
+                  emoji: true,
+                },
+                style: "primary",
+                value: `${channelId}:channel:${messageCount}:${encodeURIComponent(
+                  summary
+                )}`,
+                action_id: "publish_channel_summary",
+              },
+              {
+                type: "button",
+                text: {
+                  type: "plain_text",
+                  text: "Notionにエクスポート",
+                  emoji: true,
+                },
+                value: `${channelId}:channel:${messageCount}:${encodeURIComponent(
+                  summary
+                )}`,
+                action_id: "export_channel_to_notion",
+              },
+              {
+                type: "button",
+                text: {
+                  type: "plain_text",
+                  text: "Markdownで表示",
+                  emoji: true,
+                },
+                value: `${channelId}:channel:${messageCount}:${encodeURIComponent(
+                  summary
+                )}`,
+                action_id: "show_channel_markdown",
+              },
+            ],
+          },
+        ],
+      });
+    } catch (error) {
+      console.error("チャンネル要約処理エラー:", error);
+      await respond({
+        text: `エラーが発生しました: ${
+          error instanceof Error ? error.message : "不明なエラー"
+        }`,
+        response_type: "ephemeral",
+      });
+    }
+  }
+);
+
+// チャンネル要約公開ボタンのアクションハンドラ
+app.action("publish_channel_summary", async ({ ack, body, client }) => {
+  await ack();
+
+  try {
+    // @ts-ignore - bodyの型定義を簡略化
+    const value = body.actions?.[0]?.value;
+
+    if (!value) {
+      throw new Error("要約データが見つかりません");
+    }
+
+    // 値からチャンネルID、メッセージ数、要約テキストを取得
+    const [channelId, channelMarker, messageCountStr, encodedSummary] =
+      value.split(":");
+    const messageCount = parseInt(messageCountStr);
+    const summary = decodeURIComponent(encodedSummary);
+
+    // チャンネルに公開として投稿
+    const postedMessageTs = await postChannelSummary(
+      client,
+      channelId,
+      summary,
+      messageCount,
+      "public"
+    );
+
+    // 確認メッセージを送信
     // @ts-ignore - bodyの型定義を簡略化
     await client.chat.update({
       // @ts-ignore - bodyの型定義を簡略化
       channel: body.channel?.id,
       // @ts-ignore - bodyの型定義を簡略化
       ts: body.message?.ts,
-      text: "📝 スレッドの要約が完了しました（あなただけに表示されています）",
+      text: "✅ 要約をチャンネルに公開しました",
       blocks: [
         {
           type: "section",
           text: {
             type: "mrkdwn",
-            text: "📝 *スレッド要約が完了しました*\n\n要約結果はあなただけに表示されています。スレッドに公開することもできます。",
+            text: "✅ 要約をチャンネルに公開しました",
+          },
+        },
+      ],
+    });
+  } catch (error) {
+    console.error("チャンネル要約公開エラー:", error);
+  }
+});
+
+// チャンネル要約のマークダウン表示ボタンのアクションハンドラ
+app.action("show_channel_markdown", async ({ ack, body, client }) => {
+  await ack();
+
+  try {
+    // @ts-ignore - bodyの型定義を簡略化
+    const value = body.actions?.[0]?.value;
+
+    if (!value) {
+      throw new Error("要約データが見つかりません");
+    }
+
+    // 値からチャンネルID、メッセージ数、要約テキストを取得
+    const [channelId, channelMarker, messageCountStr, encodedSummary] =
+      value.split(":");
+    const messageCount = parseInt(messageCountStr);
+    const summary = decodeURIComponent(encodedSummary);
+
+    // マークダウンを生成
+    const markdown = await generateChannelMarkdown(
+      client,
+      channelId,
+      summary,
+      messageCount
+    );
+
+    // マークダウンをコードブロックとして表示
+    // @ts-ignore - bodyの型定義を簡略化
+    await client.chat.update({
+      // @ts-ignore - bodyの型定義を簡略化
+      channel: body.channel?.id,
+      // @ts-ignore - bodyの型定義を簡略化
+      ts: body.message?.ts,
+      text: "📝 Markdown形式の要約",
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "📝 *Markdown形式のチャンネル要約*\n\n以下のテキストをコピーして `.md` ファイルとして保存できます。",
+          },
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "```markdown\n" + markdown + "\n```",
           },
         },
         {
           type: "actions",
-          block_id: "summary_visibility",
+          block_id: "markdown_actions",
           elements: [
             {
               type: "button",
               text: {
                 type: "plain_text",
-                text: "スレッドに公開する",
+                text: "元の画面に戻る",
                 emoji: true,
               },
-              style: "primary",
-              value: `${channelId}:${threadTs}:${encodedSummary}`,
-              action_id: "publish_summary_to_thread",
-            },
-            {
-              type: "button",
-              text: {
-                type: "plain_text",
-                text: "Notionにエクスポート",
-                emoji: true,
-              },
-              value: `${channelId}:${threadTs}:${encodedSummary}`,
-              action_id: "export_to_notion",
-            },
-            {
-              type: "button",
-              text: {
-                type: "plain_text",
-                text: "Markdownで表示",
-                emoji: true,
-              },
-              value: `${channelId}:${threadTs}:${encodedSummary}`,
-              action_id: "show_markdown",
+              value: `${channelId}:channel:${messageCount}:${encodedSummary}`,
+              action_id: "back_to_summary",
             },
           ],
         },
       ],
     });
   } catch (error) {
-    console.error("画面復元エラー:", error);
+    console.error("チャンネルMarkdown表示エラー:", error);
+    // @ts-ignore - bodyの型定義を簡略化
+    await client.chat.update({
+      // @ts-ignore - bodyの型定義を簡略化
+      channel: body.channel?.id,
+      // @ts-ignore - bodyの型定義を簡略化
+      ts: body.message?.ts,
+      text: "❌ Markdown表示に失敗しました",
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `❌ Markdown表示に失敗しました: ${
+              error instanceof Error ? error.message : "不明なエラー"
+            }`,
+          },
+        },
+        {
+          type: "actions",
+          block_id: "markdown_error_actions",
+          elements: [
+            {
+              type: "button",
+              text: {
+                type: "plain_text",
+                text: "元の画面に戻る",
+                emoji: true,
+              },
+              // @ts-ignore - bodyの型定義を簡略化
+              value: body.actions?.[0]?.value,
+              action_id: "back_to_summary",
+            },
+          ],
+        },
+      ],
+    });
+  }
+});
+
+// チャンネル要約のNotionエクスポートボタンのアクションハンドラ
+app.action("export_channel_to_notion", async ({ ack, body, client }) => {
+  await ack();
+
+  try {
+    // @ts-ignore - bodyの型定義を簡略化
+    const value = body.actions?.[0]?.value;
+
+    if (!value) {
+      throw new Error("要約データが見つかりません");
+    }
+
+    // 値からチャンネルID、メッセージ数、要約テキストを取得
+    const [channelId, channelMarker, messageCountStr, encodedSummary] =
+      value.split(":");
+    const messageCount = parseInt(messageCountStr);
+    const summary = decodeURIComponent(encodedSummary);
+
+    // チャンネル名を取得（タイトルに使用）
+    const channelInfo = await client.conversations.info({
+      channel: channelId,
+    });
+    const channelName = channelInfo.channel?.name || "チャンネル";
+
+    // タイトルを作成
+    const title = `${channelName} チャンネル要約 (最新${messageCount}件)`;
+
+    // Notionにエクスポート
+    const result = await exportToNotion(summary, { title });
+
+    if (result.success) {
+      // 成功メッセージ
+      // @ts-ignore - bodyの型定義を簡略化
+      await client.chat.update({
+        // @ts-ignore - bodyの型定義を簡略化
+        channel: body.channel?.id,
+        // @ts-ignore - bodyの型定義を簡略化
+        ts: body.message?.ts,
+        text: "✅ Notionへのエクスポートが完了しました",
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: "✅ Notionへのエクスポートが完了しました",
+            },
+          },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `<${result.url}|Notionで開く>`,
+            },
+          },
+        ],
+      });
+    } else {
+      // エラーメッセージ
+      // @ts-ignore - bodyの型定義を簡略化
+      await client.chat.update({
+        // @ts-ignore - bodyの型定義を簡略化
+        channel: body.channel?.id,
+        // @ts-ignore - bodyの型定義を簡略化
+        ts: body.message?.ts,
+        text: "❌ Notionへのエクスポートに失敗しました",
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `❌ Notionへのエクスポートに失敗しました: ${result.error}`,
+            },
+          },
+        ],
+      });
+    }
+  } catch (error) {
+    console.error("チャンネルNotionエクスポートエラー:", error);
+    // @ts-ignore - bodyの型定義を簡略化
+    await client.chat.update({
+      // @ts-ignore - bodyの型定義を簡略化
+      channel: body.channel?.id,
+      // @ts-ignore - bodyの型定義を簡略化
+      ts: body.message?.ts,
+      text: "❌ Notionへのエクスポートに失敗しました",
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `❌ Notionへのエクスポートに失敗しました: ${
+              error instanceof Error ? error.message : "不明なエラー"
+            }`,
+          },
+        },
+      ],
+    });
   }
 });
 
