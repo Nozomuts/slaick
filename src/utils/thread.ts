@@ -163,3 +163,34 @@ export const postChannelSummary = async (
     throw new Error("要約の投稿中にエラーが発生しました");
   }
 };
+
+/**
+ * マークダウンファイルをSlackにアップロードする
+ */
+export const uploadMarkdownFile = async (
+  client: WebClient,
+  channelId: string,
+  content: string,
+  fileName: string,
+  title?: string
+): Promise<string> => {
+  try {
+    // ファイルをアップロード
+    const result = await client.files.upload({
+      channels: channelId,
+      content: content,
+      filename: fileName,
+      filetype: "markdown",
+      title: title || fileName,
+    });
+
+    if (!result.file?.permalink) {
+      throw new Error("ファイルのアップロードに失敗しました");
+    }
+
+    return result.file.permalink;
+  } catch (error) {
+    console.error("ファイルアップロードエラー:", error);
+    throw new Error("ファイルのアップロード中にエラーが発生しました");
+  }
+};

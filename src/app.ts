@@ -6,6 +6,7 @@ import {
   getChannelMessages,
   postSummaryToThread,
   postChannelSummary,
+  uploadMarkdownFile,
 } from "./utils/thread";
 import { exportToNotion } from "./utils/notion";
 import { generateMarkdown, generateChannelMarkdown } from "./utils/markdown";
@@ -283,7 +284,30 @@ app.action("show_markdown", async ({ ack, body, client }) => {
       summary
     );
 
-    // マークダウンをコードブロックとして表示
+    // チャンネル名を取得（ファイル名に使用）
+    const channelInfo = await client.conversations.info({
+      channel: channelId,
+    });
+    const channelName = channelInfo.channel?.name || "channel";
+
+    // 日付を取得（ファイル名に使用）
+    const now = new Date();
+    const dateStr = now.toISOString().substring(0, 10).replace(/-/g, "");
+
+    // ファイル名を作成
+    const fileName = `${channelName}_thread_summary_${dateStr}.md`;
+
+    // マークダウンファイルをSlackにアップロード
+    const fileUrl = await uploadMarkdownFile(
+      client,
+      // @ts-ignore - bodyの型定義を簡略化
+      body.channel?.id || channelId,
+      markdown,
+      fileName,
+      "スレッド要約"
+    );
+
+    // マークダウンをコードブロックとして表示し、ダウンロードリンクを提供
     // @ts-ignore - bodyの型定義を簡略化
     await client.chat.update({
       // @ts-ignore - bodyの型定義を簡略化
@@ -296,14 +320,25 @@ app.action("show_markdown", async ({ ack, body, client }) => {
           type: "section",
           text: {
             type: "mrkdwn",
-            text: "📝 *Markdown形式の要約*\n\n以下のテキストをコピーして `.md` ファイルとして保存できます。",
+            text: "📝 *Markdown形式の要約*\n\nマークダウンファイルが作成されました。以下のリンクからダウンロードできます。",
           },
         },
         {
           type: "section",
           text: {
             type: "mrkdwn",
-            text: "```markdown\n" + markdown + "\n```",
+            text: `<${fileUrl}|${fileName} をダウンロード>`,
+          },
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text:
+              "プレビュー:\n```markdown\n" +
+              markdown.substring(0, 500) +
+              (markdown.length > 500 ? "...\n(省略)" : "") +
+              "\n```",
           },
         },
         {
@@ -658,7 +693,7 @@ app.action("publish_channel_summary", async ({ ack, body, client }) => {
   }
 });
 
-// チャンネル要約のマークダウン表示ボタンのアクションハンドラ
+// チャンネル要約のマークダウンダウンロードボタンのアクションハンドラ
 app.action("show_channel_markdown", async ({ ack, body, client }) => {
   await ack();
 
@@ -684,7 +719,30 @@ app.action("show_channel_markdown", async ({ ack, body, client }) => {
       messageCount
     );
 
-    // マークダウンをコードブロックとして表示
+    // チャンネル名を取得（ファイル名に使用）
+    const channelInfo = await client.conversations.info({
+      channel: channelId,
+    });
+    const channelName = channelInfo.channel?.name || "channel";
+
+    // 日付を取得（ファイル名に使用）
+    const now = new Date();
+    const dateStr = now.toISOString().substring(0, 10).replace(/-/g, "");
+
+    // ファイル名を作成
+    const fileName = `${channelName}_channel_summary_${dateStr}.md`;
+
+    // マークダウンファイルをSlackにアップロード
+    const fileUrl = await uploadMarkdownFile(
+      client,
+      // @ts-ignore - bodyの型定義を簡略化
+      body.channel?.id || channelId,
+      markdown,
+      fileName,
+      `チャンネル要約（最新${messageCount}件）`
+    );
+
+    // マークダウンをコードブロックとして表示し、ダウンロードリンクを提供
     // @ts-ignore - bodyの型定義を簡略化
     await client.chat.update({
       // @ts-ignore - bodyの型定義を簡略化
@@ -697,14 +755,25 @@ app.action("show_channel_markdown", async ({ ack, body, client }) => {
           type: "section",
           text: {
             type: "mrkdwn",
-            text: "📝 *Markdown形式のチャンネル要約*\n\n以下のテキストをコピーして `.md` ファイルとして保存できます。",
+            text: "📝 *Markdown形式のチャンネル要約*\n\nマークダウンファイルが作成されました。以下のリンクからダウンロードできます。",
           },
         },
         {
           type: "section",
           text: {
             type: "mrkdwn",
-            text: "```markdown\n" + markdown + "\n```",
+            text: `<${fileUrl}|${fileName} をダウンロード>`,
+          },
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text:
+              "プレビュー:\n```markdown\n" +
+              markdown.substring(0, 500) +
+              (markdown.length > 500 ? "...\n(省略)" : "") +
+              "\n```",
           },
         },
         {
