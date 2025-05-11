@@ -18,94 +18,109 @@ const app = new App({
   token: process.env.SLACK_BOT_TOKEN!,
 });
 
-// スラッシュコマンドハンドラ
-app.command("/summarize", async ({ command, ack, respond, client, body }) => {
-  await ack();
+// スレッド要約用スラッシュコマンドハンドラ
+app.command(
+  "/summarize_thread",
+  async ({ command, ack, respond, client, body }) => {
+    await ack();
 
-  try {
-    // エフェメラルメッセージで処理中を通知
-    await respond({
-      text: "📝 要約を作成しています...",
-      response_type: "ephemeral",
-    });
+    try {
+      // エフェメラルメッセージで処理中を通知
+      await respond({
+        text: "📝 スレッドの要約を作成しています...",
+        response_type: "ephemeral",
+      });
 
-    const channelId = command.channel_id;
-    // コマンド引数からスレッドTSを取得（引数がない場合は直接コマンドが実行されたチャンネルを対象）
-    const threadTs = command.text || command.ts;
+      const channelId = command.channel_id;
+      // コマンド引数からスレッドTSを取得（引数がない場合は直接コマンドが実行されたチャンネルを対象）
+      const threadTs = command.text || command.ts;
 
-    // スレッドメッセージを取得
-    const threadText = await getThreadMessages(client, channelId, threadTs);
+      // スレッドメッセージを取得
+      const threadText = await getThreadMessages(client, channelId, threadTs);
 
-    // OpenRouterでスレッドを要約
-    const summary = await summarizeThread(threadText);
+      // OpenRouterでスレッドを要約
+      const summary = await summarizeThread(threadText);
 
-    // ユーザーID取得
-    const userId = body.user_id;
+      // ユーザーID取得
+      const userId = body.user_id;
 
-    // まず非公開で要約結果を表示
-    await postSummaryToThread(client, channelId, threadTs, summary, "private");
+      // まず非公開で要約結果を表示
+      await postSummaryToThread(
+        client,
+        channelId,
+        threadTs,
+        summary,
+        "private"
+      );
 
-    // 公開するボタン付きの通知
-    await respond({
-      text: "📝 スレッドの要約が完了しました（あなただけに表示されています）",
-      response_type: "ephemeral",
-      blocks: [
-        {
-          type: "section",
-          text: {
-            type: "mrkdwn",
-            text: "📝 *スレッド要約が完了しました*\n\n要約結果はあなただけに表示されています。スレッドに公開することもできます。",
+      // 公開するボタン付きの通知
+      await respond({
+        text: "📝 スレッドの要約が完了しました（あなただけに表示されています）",
+        response_type: "ephemeral",
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: "📝 *スレッド要約が完了しました*\n\n要約結果はあなただけに表示されています。スレッドに公開することもできます。",
+            },
           },
-        },
-        {
-          type: "actions",
-          block_id: "summary_visibility",
-          elements: [
-            {
-              type: "button",
-              text: {
-                type: "plain_text",
-                text: "スレッドに公開する",
-                emoji: true,
+          {
+            type: "actions",
+            block_id: "summary_visibility",
+            elements: [
+              {
+                type: "button",
+                text: {
+                  type: "plain_text",
+                  text: "スレッドに公開する",
+                  emoji: true,
+                },
+                style: "primary",
+                value: `${channelId}:${threadTs}:${encodeURIComponent(
+                  summary
+                )}`,
+                action_id: "publish_summary_to_thread",
               },
-              style: "primary",
-              value: `${channelId}:${threadTs}:${encodeURIComponent(summary)}`,
-              action_id: "publish_summary_to_thread",
-            },
-            {
-              type: "button",
-              text: {
-                type: "plain_text",
-                text: "Notionにエクスポート",
-                emoji: true,
+              {
+                type: "button",
+                text: {
+                  type: "plain_text",
+                  text: "Notionにエクスポート",
+                  emoji: true,
+                },
+                value: `${channelId}:${threadTs}:${encodeURIComponent(
+                  summary
+                )}`,
+                action_id: "export_to_notion",
               },
-              value: `${channelId}:${threadTs}:${encodeURIComponent(summary)}`,
-              action_id: "export_to_notion",
-            },
-            {
-              type: "button",
-              text: {
-                type: "plain_text",
-                text: "Markdownで表示",
-                emoji: true,
+              {
+                type: "button",
+                text: {
+                  type: "plain_text",
+                  text: "Markdownで表示",
+                  emoji: true,
+                },
+                value: `${channelId}:${threadTs}:${encodeURIComponent(
+                  summary
+                )}`,
+                action_id: "show_markdown",
               },
-              value: `${channelId}:${threadTs}:${encodeURIComponent(summary)}`,
-              action_id: "show_markdown",
-            },
-          ],
-        },
-      ],
-    });
-  } catch (error) {
-    console.error("要約処理エラー:", error);
-    await respond({
-      text: `エラーが発生しました: ${
-        error instanceof Error ? error.message : "不明なエラー"
-      }`,
-      response_type: "ephemeral",
-    });
+            ],
+          },
+        ],
+      });
+    } catch (error) {
+      console.error("要約処理エラー:", error);
+      await respond({
+        text: `エラーが発生しました: ${
+          error instanceof Error ? error.message : "不明なエラー"
+        }`,
+        response_type: "ephemeral",
+      });
+    }
   }
-});
+);
 
 // 公開要約ボタンのアクションハンドラ
 app.action("publish_summary_to_thread", async ({ ack, body, client }) => {
@@ -539,7 +554,7 @@ app.action("back_to_summary", async ({ ack, body, client }) => {
 
 // チャンネル要約コマンド
 app.command(
-  "/summarize-channel",
+  "/summarize_channel",
   async ({ command, ack, respond, client, body }) => {
     await ack();
 
