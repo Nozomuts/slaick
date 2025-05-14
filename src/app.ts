@@ -1,21 +1,23 @@
 import { App } from "@slack/bolt";
 import * as dotenv from "dotenv";
-import { summarizeThread } from "./utils/openRouter";
+import { summarizeThread, summarizeChannelContent } from "./utils/openRouter";
 import {
   getThreadMessages,
   getChannelMessages,
   postSummaryToThread,
   postChannelSummary,
   uploadMarkdownFile,
-} from "./utils/thread";
+} from "./utils/slack";
 import { exportToNotion } from "./utils/notion";
 import { generateMarkdown, generateChannelMarkdown } from "./utils/markdown";
 
 dotenv.config();
 
 const app = new App({
-  signingSecret: process.env.SLACK_SIGNING_SECRET!,
-  token: process.env.SLACK_BOT_TOKEN!,
+  signingSecret: process.env.SLACK_SIGNING_SECRET,
+  token: process.env.SLACK_BOT_TOKEN,
+  socketMode: true,
+  appToken: process.env.SLACK_APP_TOKEN,
 });
 
 // スレッド要約用スラッシュコマンドハンドラ
@@ -668,10 +670,7 @@ app.command(
       );
 
       // OpenRouterでチャンネルを要約
-      const summary = await summarizeThread(channelText);
-
-      // ユーザーID取得
-      const userId = body.user_id;
+      const summary = await summarizeChannelContent(channelText, messageCount);
 
       // 公開するボタン付きの通知
       await respond({
