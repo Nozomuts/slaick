@@ -58,7 +58,7 @@ export const getChannelMessages = async (
     // メッセージのユーザー名とテキストを連結
     const messageTexts = await Promise.all(
       result.messages
-        .filter((message) => message.text && !message.subtype) // サブタイプのないメッセージのみ
+        .filter((message) => message.text && (!message.subtype || message.subtype === 'bot_message')) // 通常のメッセージとボットメッセージのみ
         .map(async (message) => {
           let username = "不明なユーザー";
 
