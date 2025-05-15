@@ -37,7 +37,7 @@ export const getThreadMessages = async (
 export const getChannelMessages = async (
   client: WebClient,
   channelId: string,
-  limit: number = 20
+  limit: number = 10
 ): Promise<string> => {
   try {
     // 最大値を制限

@@ -18,7 +18,7 @@ export const summarizeThread = async (threadText: string): Promise<string> => {
     const response = await axios.post<OpenRouterResponse>(
       "https://openrouter.ai/api/v1/chat/completions",
       {
-        model: "meta-llama/llama-4-scout:free",
+        model: "deepseek/deepseek-chat-v3-0324:free",
         messages,
       },
       {
