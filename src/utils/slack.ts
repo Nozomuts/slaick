@@ -37,11 +37,11 @@ export const getThreadMessages = async (
 export const getChannelMessages = async (
   client: WebClient,
   channelId: string,
-  limit: number = 100
+  limit: number = 20
 ): Promise<string> => {
   try {
     // 最大値を制限
-    const actualLimit = Math.min(limit, 1000);
+    const actualLimit = Math.min(limit, 100);
 
     const result = await client.conversations.history({
       channel: channelId,

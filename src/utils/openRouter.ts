@@ -50,11 +50,11 @@ export const summarizeChannelContent = async (channelText: string, messageCount:
       {
         role: "system",
         content:
-          `あなたは、与えられたSlackチャンネルの会話履歴を要約するアシスタントです。会話履歴は、最新の${messageCount}件のメッセージから構成されています。`,
+          `あなたは、与えられたSlackチャンネルの会話履歴を要約するアシスタントです。要約内容だけを表示してください。会話履歴は、最新の${messageCount}件のメッセージから構成されています。`,
       },
       {
         role: "user",
-        content: `以下のSlackチャンネルのメッセージ履歴（最新${messageCount}件）を簡潔に要約してください。\n\n${channelText}`,
+        content: `以下のSlackチャンネルのメッセージ履歴（最新${messageCount}件）を500文字以内で簡潔に要約してください。\n\n${channelText}`,
       },
     ];
 

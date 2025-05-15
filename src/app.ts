@@ -20,6 +20,10 @@ const app = new App({
   appToken: process.env.SLACK_APP_TOKEN,
 });
 
+// Constants for text length limits
+const MAX_RAW_SUMMARY_FOR_BUTTON_VALUE = 600; // Max raw summary length for button values
+const MAX_SUMMARY_DISPLAY_LENGTH_IN_BLOCK = 2800; // Max summary length for display in a section block text
+
 // スレッド要約用スラッシュコマンドハンドラ
 app.command(
   "/summarize_thread",
@@ -52,6 +56,15 @@ app.command(
 
       // OpenRouterでスレッドを要約
       const summary = await summarizeThread(threadText);
+
+      // Truncate summary for button values if necessary
+      let summaryForButtonValue = summary;
+      if (summary.length > MAX_RAW_SUMMARY_FOR_BUTTON_VALUE) {
+        summaryForButtonValue = summary.substring(0, MAX_RAW_SUMMARY_FOR_BUTTON_VALUE);
+        console.warn(`[summarize_thread] Summary truncated for button 'value' due to length. Original: ${summary.length}, Truncated for button: ${MAX_RAW_SUMMARY_FOR_BUTTON_VALUE}. Full summary may not be processed by actions.`);
+      }
+      const encodedSummaryForButtons = encodeURIComponent(summaryForButtonValue);
+
 
       // ユーザーID取得
       const userId = body.user_id;
@@ -89,9 +102,7 @@ app.command(
                   emoji: true,
                 },
                 style: "primary",
-                value: `${channelId}:${threadTs}:${encodeURIComponent(
-                  summary
-                )}`,
+                value: `${channelId}:${threadTs}:${encodedSummaryForButtons}`,
                 action_id: "publish_summary_to_thread",
               },
               {
@@ -101,9 +112,7 @@ app.command(
                   text: "Notionにエクスポート",
                   emoji: true,
                 },
-                value: `${channelId}:${threadTs}:${encodeURIComponent(
-                  summary
-                )}`,
+                value: `${channelId}:${threadTs}:${encodedSummaryForButtons}`,
                 action_id: "export_to_notion",
               },
               {
@@ -113,9 +122,7 @@ app.command(
                   text: "Markdownで表示",
                   emoji: true,
                 },
-                value: `${channelId}:${threadTs}:${encodeURIComponent(
-                  summary
-                )}`,
+                value: `${channelId}:${threadTs}:${encodedSummaryForButtons}`,
                 action_id: "show_markdown",
               },
             ],
@@ -672,6 +679,20 @@ app.command(
       // OpenRouterでチャンネルを要約
       const summary = await summarizeChannelContent(channelText, messageCount);
 
+      // Truncate summary for display in section block
+      const displayedSummaryInBlock = summary.length > MAX_SUMMARY_DISPLAY_LENGTH_IN_BLOCK
+          ? summary.substring(0, MAX_SUMMARY_DISPLAY_LENGTH_IN_BLOCK) + "...\n(要約全体は長いため一部のみ表示しています)"
+          : summary;
+
+      // Truncate summary for button values to avoid exceeding 2000 char limit for value string
+      let summaryForButtonValue = summary;
+      if (summary.length > MAX_RAW_SUMMARY_FOR_BUTTON_VALUE) {
+          summaryForButtonValue = summary.substring(0, MAX_RAW_SUMMARY_FOR_BUTTON_VALUE);
+          // Log this truncation, as it affects functionality if user clicks button
+          console.warn(`[summarize_channel] Summary truncated for button 'value' due to length. Original: ${summary.length}, Truncated for button: ${MAX_RAW_SUMMARY_FOR_BUTTON_VALUE}. Full summary may not be processed by actions.`);
+      }
+      const encodedSummaryForButtons = encodeURIComponent(summaryForButtonValue);
+
       // 公開するボタン付きの通知
       await respond({
         text: `📝 チャンネルの要約が完了しました (最新${messageCount}件)（あなただけに表示されています）`,
@@ -681,7 +702,7 @@ app.command(
             type: "section",
             text: {
               type: "mrkdwn",
-              text: `📝 *チャンネル要約が完了しました (最新${messageCount}件)*\n\n${summary}\n\n要約結果はあなただけに表示されています。チャンネルに公開することもできます。`,
+              text: `📝 *チャンネル要約が完了しました (最新${messageCount}件)*\n\n${displayedSummaryInBlock}\n\n要約結果はあなただけに表示されています。チャンネルに公開することもできます。`,
             },
           },
           {
@@ -696,9 +717,7 @@ app.command(
                   emoji: true,
                 },
                 style: "primary",
-                value: `${channelId}:channel:${messageCount}:${encodeURIComponent(
-                  summary
-                )}`,
+                value: `${channelId}:channel:${messageCount}:${encodedSummaryForButtons}`,
                 action_id: "publish_channel_summary",
               },
               {
@@ -708,9 +727,7 @@ app.command(
                   text: "Notionにエクスポート",
                   emoji: true,
                 },
-                value: `${channelId}:channel:${messageCount}:${encodeURIComponent(
-                  summary
-                )}`,
+                value: `${channelId}:channel:${messageCount}:${encodedSummaryForButtons}`,
                 action_id: "export_channel_to_notion",
               },
               {
@@ -720,9 +737,7 @@ app.command(
                   text: "Markdownで表示",
                   emoji: true,
                 },
-                value: `${channelId}:channel:${messageCount}:${encodeURIComponent(
-                  summary
-                )}`,
+                value: `${channelId}:channel:${messageCount}:${encodedSummaryForButtons}`,
                 action_id: "show_channel_markdown",
               },
             ],
