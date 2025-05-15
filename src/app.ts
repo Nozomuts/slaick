@@ -20,126 +20,76 @@ const app = new App({
   appToken: process.env.SLACK_APP_TOKEN,
 });
 
-// Constants for text length limits
-const MAX_RAW_SUMMARY_FOR_BUTTON_VALUE = 200; // Max raw summary length for button values (保守的に設定)
-const MAX_SUMMARY_DISPLAY_LENGTH_IN_BLOCK = 2800; // Max summary length for display in a section block text
+// メッセージイベントのハンドラ
+app.event("app_mention", async ({ event, say, client }) => {
+  try {
+    const channelId = event.channel;
 
-// スレッド要約用スラッシュコマンドハンドラ
-app.command(
-  "/summarize_thread",
-  async ({ command, ack, respond, client, body }) => {
-    await ack();
-
-    try {
-      // エフェメラルメッセージで処理中を通知
-      await respond({
+    if (event.thread_ts) {
+      // スレッド内でメンションされた場合、スレッドを要約
+      // 処理中メッセージを送信
+      await say({
         text: "📝 スレッドの要約を作成しています...",
-        response_type: "ephemeral",
+        thread_ts: event.thread_ts,
       });
 
-      const channelId = command.channel_id;
-      // コマンド引数からスレッドTSを取得（引数がない場合は直接コマンドが実行されたチャンネルを対象）
-      // スラッシュコマンドがスレッド内で実行された場合は body.message.thread_ts を使う
-      const threadTs =
-        command.text || body.message?.thread_ts || body.message?.ts;
-
-      if (!threadTs) {
-        await respond({
-          text: "スレッドの特定ができませんでした。スレッド内から実行するか、スレッドのURLまたはタイムスタンプを引数に指定してください。",
-          response_type: "ephemeral",
-        });
-        return;
-      }
-
       // スレッドメッセージを取得
-      const threadText = await getThreadMessages(client, channelId, threadTs);
+      const threadText = await getThreadMessages(
+        client,
+        channelId,
+        event.thread_ts
+      );
 
       // OpenRouterでスレッドを要約
       const summary = await summarizeThread(threadText);
 
-      // Truncate summary for button values if necessary
-      let summaryForButtonValue = summary;
-      if (summary.length > MAX_RAW_SUMMARY_FOR_BUTTON_VALUE) {
-        summaryForButtonValue = summary.substring(0, MAX_RAW_SUMMARY_FOR_BUTTON_VALUE);
-        console.warn(`[summarize_thread] Summary truncated for button 'value' due to length. Original: ${summary.length}, Truncated for button: ${MAX_RAW_SUMMARY_FOR_BUTTON_VALUE}. Full summary may not be processed by actions.`);
-      }
-      const encodedSummaryForButtons = encodeURIComponent(summaryForButtonValue);
-
-
-      // ユーザーID取得
-      const userId = body.user_id;
-
-      // まず非公開で要約結果を表示
+      // スレッドに要約を投稿
       await postSummaryToThread(
         client,
         channelId,
-        threadTs,
+        event.thread_ts,
         summary,
-        "private"
+        "public"
+      );
+    } else {
+      // チャンネル直接でメンションされた場合、チャンネルを要約
+      const messageCount = 20; // デフォルトで最新20件を要約
+
+      // 処理中メッセージを送信
+      await say({
+        text: "📝 チャンネルの要約を作成しています...",
+        thread_ts: event.ts,
+      });
+
+      // チャンネルのメッセージを取得
+      const channelText = await getChannelMessages(
+        client,
+        channelId,
+        messageCount
       );
 
-      // 公開するボタン付きの通知
-      await respond({
-        text: "📝 スレッドの要約が完了しました（あなただけに表示されています）",
-        response_type: "ephemeral",
-        blocks: [
-          {
-            type: "section",
-            text: {
-              type: "mrkdwn",
-              text: "📝 *スレッド要約が完了しました*\n\n要約結果はあなただけに表示されています。スレッドに公開することもできます。",
-            },
-          },
-          {
-            type: "actions",
-            block_id: "summary_visibility",
-            elements: [
-              {
-                type: "button",
-                text: {
-                  type: "plain_text",
-                  text: "スレッドに公開する",
-                  emoji: true,
-                },
-                style: "primary",
-                value: `${channelId}:${threadTs}:${encodedSummaryForButtons}`,
-                action_id: "publish_summary_to_thread",
-              },
-              {
-                type: "button",
-                text: {
-                  type: "plain_text",
-                  text: "Notionにエクスポート",
-                  emoji: true,
-                },
-                value: `${channelId}:${threadTs}:${encodedSummaryForButtons}`,
-                action_id: "export_to_notion",
-              },
-              {
-                type: "button",
-                text: {
-                  type: "plain_text",
-                  text: "Markdownで表示",
-                  emoji: true,
-                },
-                value: `${channelId}:${threadTs}:${encodedSummaryForButtons}`,
-                action_id: "show_markdown",
-              },
-            ],
-          },
-        ],
-      });
-    } catch (error) {
-      console.error("要約処理エラー:", error);
-      await respond({
-        text: `エラーが発生しました: ${
-          error instanceof Error ? error.message : "不明なエラー"
-        }`,
-        response_type: "ephemeral",
-      });
+      // OpenRouterでチャンネルを要約
+      const summary = await summarizeChannelContent(channelText, messageCount);
+
+      // 要約を投稿
+      await postChannelSummary(
+        client,
+        channelId,
+        summary,
+        messageCount,
+        "public"
+      );
     }
+  } catch (error) {
+    console.error("メンションイベントエラー:", error);
+    await say({
+      text: `エラーが発生しました: ${
+        error instanceof Error ? error.message : "不明なエラー"
+      }`,
+      thread_ts: event.thread_ts || event.ts,
+    });
   }
-);
+});
 
 // 公開要約ボタンのアクションハンドラ
 app.action(
@@ -645,116 +595,7 @@ app.action("back_to_summary", async ({ ack, body, client, respond }) => {
   }
 });
 
-// チャンネル要約コマンド
-app.command(
-  "/summarize_channel",
-  async ({ command, ack, respond, client, body }) => {
-    await ack();
-
-    try {
-      // エフェメラルメッセージで処理中を通知
-      await respond({
-        text: "📝 チャンネルの要約を作成しています...",
-        response_type: "ephemeral",
-      });
-
-      const channelId = command.channel_id;
-
-      // コマンド引数からメッセージ数を取得（引数がない場合はデフォルト100件）
-      let messageCount = 100;
-      if (command.text) {
-        const parsedCount = parseInt(command.text);
-        if (!isNaN(parsedCount) && parsedCount > 0) {
-          messageCount = Math.min(parsedCount, 1000); // 最大1000件に制限
-        }
-      }
-
-      // チャンネルのメッセージを取得
-      const channelText = await getChannelMessages(
-        client,
-        channelId,
-        messageCount
-      );
-
-      // OpenRouterでチャンネルを要約
-      const summary = await summarizeChannelContent(channelText, messageCount);
-
-      // Truncate summary for display in section block
-      const displayedSummaryInBlock = summary.length > MAX_SUMMARY_DISPLAY_LENGTH_IN_BLOCK
-          ? summary.substring(0, MAX_SUMMARY_DISPLAY_LENGTH_IN_BLOCK) + "...\n(要約全体は長いため一部のみ表示しています)"
-          : summary;
-
-      // Truncate summary for button values to avoid exceeding 2000 char limit for value string
-      let summaryForButtonValue = summary;
-      if (summary.length > MAX_RAW_SUMMARY_FOR_BUTTON_VALUE) {
-          summaryForButtonValue = summary.substring(0, MAX_RAW_SUMMARY_FOR_BUTTON_VALUE);
-          // Log this truncation, as it affects functionality if user clicks button
-          console.warn(`[summarize_channel] Summary truncated for button 'value' due to length. Original: ${summary.length}, Truncated for button: ${MAX_RAW_SUMMARY_FOR_BUTTON_VALUE}. Full summary may not be processed by actions.`);
-      }
-      const encodedSummaryForButtons = encodeURIComponent(summaryForButtonValue);
-
-      // 公開するボタン付きの通知
-      await respond({
-        text: `📝 チャンネルの要約が完了しました (最新${messageCount}件)（あなただけに表示されています）`,
-        response_type: "ephemeral",
-        blocks: [
-          {
-            type: "section",
-            text: {
-              type: "mrkdwn",
-              text: `📝 *チャンネル要約が完了しました (最新${messageCount}件)*\n\n${displayedSummaryInBlock}\n\n要約結果はあなただけに表示されています。チャンネルに公開することもできます。`,
-            },
-          },
-          {
-            type: "actions",
-            block_id: "summary_visibility",
-            elements: [
-              {
-                type: "button",
-                text: {
-                  type: "plain_text",
-                  text: "チャンネルに公開する",
-                  emoji: true,
-                },
-                style: "primary",
-                value: `${channelId}:channel:${messageCount}:${encodedSummaryForButtons}`,
-                action_id: "publish_channel_summary",
-              },
-              {
-                type: "button",
-                text: {
-                  type: "plain_text",
-                  text: "Notionにエクスポート",
-                  emoji: true,
-                },
-                value: `${channelId}:channel:${messageCount}:${encodedSummaryForButtons}`,
-                action_id: "export_channel_to_notion",
-              },
-              {
-                type: "button",
-                text: {
-                  type: "plain_text",
-                  text: "Markdownで表示",
-                  emoji: true,
-                },
-                value: `${channelId}:channel:${messageCount}:${encodedSummaryForButtons}`,
-                action_id: "show_channel_markdown",
-              },
-            ],
-          },
-        ],
-      });
-    } catch (error) {
-      console.error("チャンネル要約処理エラー:", error);
-      await respond({
-        text: `エラーが発生しました: ${
-          error instanceof Error ? error.message : "不明なエラー"
-        }`,
-        response_type: "ephemeral",
-      });
-    }
-  }
-);
+// チャンネル要約のNotionエクスポートボタンのアクションハンドラ
 
 // チャンネル要約公開ボタンのアクションハンドラ
 app.action(
