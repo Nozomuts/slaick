@@ -21,7 +21,7 @@ const app = new App({
 });
 
 // Constants for text length limits
-const MAX_RAW_SUMMARY_FOR_BUTTON_VALUE = 600; // Max raw summary length for button values
+const MAX_RAW_SUMMARY_FOR_BUTTON_VALUE = 200; // Max raw summary length for button values (保守的に設定)
 const MAX_SUMMARY_DISPLAY_LENGTH_IN_BLOCK = 2800; // Max summary length for display in a section block text
 
 // スレッド要約用スラッシュコマンドハンドラ
