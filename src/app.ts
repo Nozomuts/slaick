@@ -5,7 +5,6 @@ import {
   getThreadMessages,
   getChannelMessages,
   postSummaryToThread,
-  postChannelSummary,
   uploadMarkdownFile,
 } from "./utils/slack";
 import { exportToNotion } from "./utils/notion";
@@ -18,77 +17,6 @@ const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
   socketMode: true,
   appToken: process.env.SLACK_APP_TOKEN,
-});
-
-// メッセージイベントのハンドラ
-app.event("app_mention", async ({ event, say, client }) => {
-  try {
-    const channelId = event.channel;
-
-    if (event.thread_ts) {
-      // スレッド内でメンションされた場合、スレッドを要約
-      // 処理中メッセージを送信
-      await say({
-        text: "📝 スレッドの要約を作成しています...",
-        thread_ts: event.thread_ts,
-      });
-
-      // スレッドメッセージを取得
-      const threadText = await getThreadMessages(
-        client,
-        channelId,
-        event.thread_ts
-      );
-
-      // OpenRouterでスレッドを要約
-      const summary = await summarizeThread(threadText);
-
-      // スレッドに要約を投稿
-      await postSummaryToThread(
-        client,
-        channelId,
-        event.thread_ts,
-        summary,
-        "public"
-      );
-    } else {
-      // チャンネル直接でメンションされた場合、チャンネルを要約
-      const messageCount = 10; // デフォルトで最新10件を要約
-
-      // 処理中メッセージを送信
-      await say({
-        text: "📝 チャンネルの要約を作成しています...",
-        thread_ts: event.ts,
-      });
-
-      // チャンネルのメッセージを取得
-      const channelText = await getChannelMessages(
-        client,
-        channelId,
-        messageCount
-      );
-
-      // OpenRouterでチャンネルを要約
-      const summary = await summarizeChannelContent(channelText, messageCount);
-
-      // 要約を投稿
-      await postChannelSummary(
-        client,
-        channelId,
-        summary,
-        messageCount,
-        "public"
-      );
-    }
-  } catch (error) {
-    console.error("メンションイベントエラー:", error);
-    await say({
-      text: `エラーが発生しました: ${
-        error instanceof Error ? error.message : "不明なエラー"
-      }`,
-      thread_ts: event.thread_ts || event.ts,
-    });
-  }
 });
 
 // 公開要約ボタンのアクションハンドラ
