@@ -1,5 +1,5 @@
 import { App, BlockAction } from "@slack/bolt";
-import { generateMarkdown } from "../services/markdown";
+import { generateMarkdown, generateChannelMarkdown } from "../services/markdown";
 import { uploadMarkdownFile } from "../services/slack";
 
 export const actionShowMarkdown = async (app: App) => {
@@ -17,15 +17,26 @@ export const actionShowMarkdown = async (app: App) => {
           throw new Error("要約データが見つかりません");
         }
 
-        const [channelId, threadTs, encodedSummary] = action.value.split(":");
+        const [channelId, summaryType, ...rest] = action.value.split(":");
+        const encodedSummary = rest.pop() || "";
         const summary = decodeURIComponent(encodedSummary);
+        const threadTs = summaryType === "thread" ? rest[0] : summaryType;
+        const isChannel = summaryType === "channel";
+        const messageCount = isChannel ? parseInt(rest[0] || "0") : 0;
 
-        const markdown = await generateMarkdown(
-          client,
-          channelId,
-          threadTs,
-          summary
-        );
+        const markdown = isChannel
+          ? await generateChannelMarkdown(
+              client,
+              channelId,
+              summary,
+              messageCount
+            )
+          : await generateMarkdown(
+              client,
+              channelId,
+              threadTs,
+              summary
+            );
 
         const fileUrl = await uploadMarkdownFile(
           client,
@@ -78,11 +89,22 @@ export const actionShowMarkdown = async (app: App) => {
                       text: "元の画面に戻る",
                       emoji: true,
                     },
-                    value: `${channelId}:${threadTs}:${encodeURIComponent(
+                    value: `${channelId}:${isChannel ? "channel" : threadTs}:${isChannel ? messageCount : ""}:${encodeURIComponent(
                       summary
                     )}`,
                     action_id: "back_to_summary",
                   },
+                  {
+                    type: "button",
+                    text: {
+                      type: "plain_text",
+                      text: "メッセージを削除",
+                      emoji: true,
+                    },
+                    style: "danger",
+                    value: `${body.channel?.id}:${body.message?.ts}`,
+                    action_id: "delete_message",
+                  }
                 ],
               },
             ],
