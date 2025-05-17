@@ -86,18 +86,6 @@ export const actionShowMarkdown = async (app: App) => {
                     type: "button",
                     text: {
                       type: "plain_text",
-                      text: "元の画面に戻る",
-                      emoji: true,
-                    },
-                    value: `${channelId}:${isChannel ? "channel" : threadTs}:${isChannel ? messageCount : ""}:${encodeURIComponent(
-                      summary
-                    )}`,
-                    action_id: "back_to_summary",
-                  },
-                  {
-                    type: "button",
-                    text: {
-                      type: "plain_text",
                       text: "メッセージを削除",
                       emoji: true,
                     },
@@ -132,28 +120,6 @@ export const actionShowMarkdown = async (app: App) => {
                     error instanceof Error ? error.message : "不明なエラー"
                   }`,
                 },
-              },
-              {
-                type: "actions",
-                block_id: "markdown_error_actions",
-                elements: [
-                  {
-                    type: "button",
-                    text: {
-                      type: "plain_text",
-                      text: "元の画面に戻る",
-                      emoji: true,
-                    },
-                    value:
-                      "actions" in body &&
-                      body.actions &&
-                      body.actions.length > 0 &&
-                      body.actions[0].type === "button"
-                        ? body.actions[0].value
-                        : undefined,
-                    action_id: "back_to_summary",
-                  },
-                ],
               },
             ],
           });

@@ -3,7 +3,6 @@ import * as dotenv from "dotenv";
 import { actionPublishSummary } from "./actions/publish_summary";
 import { actionExportToNotion } from "./actions/export_to_notion";
 import { actionShowMarkdown } from "./actions/show_markdown";
-import { actionBackToSummary } from "./actions/back_to_summary";
 import { shortcutSummarizeThread } from "./shortcuts/summarize_thread";
 import { shortcutSummarizeChannel } from "./shortcuts/summarize_channel";
 import { viewChannelSelectModal } from "./views/channel_select_modal";
@@ -23,7 +22,6 @@ shortcutSummarizeChannel(app);
 actionPublishSummary(app);
 actionExportToNotion(app);
 actionShowMarkdown(app);
-actionBackToSummary(app);
 
 viewChannelSelectModal(app);
 
