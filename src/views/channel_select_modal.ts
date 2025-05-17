@@ -1,0 +1,108 @@
+import { App } from "@slack/bolt";
+import { getChannelMessages } from "../services/slack";
+import { summarizeChannelContent } from "../services/openRouter";
+
+export const viewChannelSelectModal = async (app: App) => {
+  app.view("channel_select_modal", async ({ ack, body, view, client }) => {
+    await ack();
+
+    try {
+      const channelId =
+        view.state.values.channel_select_block.channel_select.selected_channel;
+      if (!channelId) {
+        throw new Error("チャンネルが選択されていません");
+      }
+
+      const messageCount = 10; // デフォルトで最新10件を要約
+
+      // 処理中メッセージを送信
+      await client.chat.postEphemeral({
+        channel: channelId,
+        user: body.user.id,
+        text: "📝 チャンネルの要約を作成しています...",
+      });
+
+      // チャンネルのメッセージを取得
+      const channelText = await getChannelMessages(
+        client,
+        channelId,
+        messageCount
+      );
+
+      // OpenRouterでチャンネルを要約
+      const summary = await summarizeChannelContent(channelText, messageCount);
+
+      // エフェメラルメッセージとして要約を表示（ボタン付き）
+      await client.chat.postEphemeral({
+        channel: channelId,
+        user: body.user.id,
+        text: "📝 チャンネルの要約が完了しました（あなただけに表示されています）",
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `📝 *チャンネル要約が完了しました (最新${messageCount}件)*\n\n要約結果はあなただけに表示されています。チャンネルに公開することもできます。`,
+            },
+          },
+          {
+            type: "actions",
+            block_id: "summary_visibility",
+            elements: [
+              {
+                type: "button",
+                text: {
+                  type: "plain_text",
+                  text: "チャンネルに公開する",
+                  emoji: true,
+                },
+                style: "primary",
+                value: `${channelId}:channel:${messageCount}:${encodeURIComponent(
+                  summary
+                )}`,
+                action_id: "publish_channel_summary",
+              },
+              {
+                type: "button",
+                text: {
+                  type: "plain_text",
+                  text: "Notionにエクスポート",
+                  emoji: true,
+                },
+                value: `${channelId}:channel:${messageCount}:${encodeURIComponent(
+                  summary
+                )}`,
+                action_id: "export_channel_to_notion",
+              },
+              {
+                type: "button",
+                text: {
+                  type: "plain_text",
+                  text: "Markdownで表示",
+                  emoji: true,
+                },
+                value: `${channelId}:channel:${messageCount}:${encodeURIComponent(
+                  summary
+                )}`,
+                action_id: "show_channel_markdown",
+              },
+            ],
+          },
+        ],
+      });
+    } catch (error) {
+      console.error("チャンネル要約エラー:", error);
+      const selectedChannelId =
+        view.state.values.channel_select_block.channel_select.selected_channel;
+      if (selectedChannelId) {
+        await client.chat.postEphemeral({
+          channel: selectedChannelId,
+          user: body.user.id,
+          text: `エラーが発生しました: ${
+            error instanceof Error ? error.message : "不明なエラー"
+          }`,
+        });
+      }
+    }
+  });
+};
