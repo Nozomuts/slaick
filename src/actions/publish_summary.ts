@@ -1,5 +1,5 @@
 import { App, BlockAction } from "@slack/bolt";
-import { postSummaryToThread, postChannelSummary } from "../services/slack";
+import { postThreadSummary, postChannelSummary } from "../services/slack";
 
 export const actionPublishSummary = async (app: App) => {
   app.action<BlockAction>("publish_summary", async ({ ack, body, client }) => {
@@ -46,13 +46,7 @@ export const actionPublishSummary = async (app: App) => {
         }
       } else {
         const threadTs = summaryType === "thread" ? rest[0] : summaryType;
-        await postSummaryToThread(
-          client,
-          channelId,
-          threadTs,
-          summary,
-          "public"
-        );
+        await postThreadSummary(client, channelId, threadTs, summary, "public");
 
         if (body.message) {
           await client.chat.update({

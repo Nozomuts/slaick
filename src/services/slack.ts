@@ -1,4 +1,4 @@
-import { WebClient } from "@slack/web-api";
+import { FilesUploadV2Arguments, WebClient } from "@slack/web-api";
 import { SummaryVisibility } from "../types";
 
 export const getThreadMessages = async (
@@ -97,7 +97,7 @@ export const getChannelMessages = async (
   }
 };
 
-export const postSummaryToThread = async (
+export const postThreadSummary = async (
   client: WebClient,
   channelId: string,
   threadTs: string,
@@ -168,24 +168,12 @@ export const postChannelSummary = async (
   }
 };
 
-/**
- * マークダウンファイルをSlackにアップロードする
- */
 export const uploadMarkdownFile = async (
   client: WebClient,
-  channelId: string,
-  content: string,
-  fileName: string,
-  title?: string
+  args: FilesUploadV2Arguments
 ): Promise<string> => {
   try {
-    const result = await client.filesUploadV2({
-      channels: channelId,
-      content: content,
-      filename: fileName,
-      filetype: "markdown",
-      title: title || fileName,
-    });
+    const result = await client.filesUploadV2(args);
 
     if (
       !result.files ||

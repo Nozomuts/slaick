@@ -3,7 +3,7 @@ import { WebClient } from "@slack/web-api";
 /**
  * 要約テキストとメタデータからマークダウン形式のテキストを生成
  */
-export const generateMarkdown = async (
+export const generateThreadMarkdown = async (
   client: WebClient,
   channelId: string,
   threadTs: string,
