@@ -3,7 +3,7 @@ import { getThreadMessages } from "../services/slack";
 import { summarizeThread } from "../services/openRouter";
 
 export const shortcutSummarizeThread = async (app: App) => {
-  app.shortcut("summarize_thread", async ({ shortcut, ack, client }) => {
+  app.shortcut("summarize_thread", async ({ shortcut, ack, client, body }) => {
     await ack();
 
     if (!("message" in shortcut) || !("channel" in shortcut)) {
@@ -11,9 +11,16 @@ export const shortcutSummarizeThread = async (app: App) => {
       return;
     }
 
+    const channelId = shortcut.channel.id;
+    const messageTs = shortcut.message.ts;
+    const userId = shortcut.user.id;
+
     try {
-      const channelId = shortcut.channel.id;
-      const messageTs = shortcut.message.ts;
+      const loadingMessage = await client.chat.postEphemeral({
+        channel: channelId,
+        user: userId,
+        text: "📝 チャンネルの要約を作成しています...",
+      });
 
       const threadText = await getThreadMessages(client, channelId, messageTs);
 
@@ -77,11 +84,17 @@ export const shortcutSummarizeThread = async (app: App) => {
           },
         ],
       });
+      if (loadingMessage.message_ts) {
+        await client.chat.delete({
+          channel: channelId,
+          ts: loadingMessage.message_ts,
+        });
+      }
     } catch (error) {
       console.error("スレッド要約ショートカットエラー:", error);
       await client.chat.postEphemeral({
-        channel: shortcut.channel.id,
-        user: shortcut.user.id,
+        channel: channelId,
+        user: userId,
         text: `エラーが発生しました: ${
           error instanceof Error ? error.message : "不明なエラー"
         }`,

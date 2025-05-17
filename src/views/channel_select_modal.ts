@@ -13,10 +13,9 @@ export const viewChannelSelectModal = async (app: App) => {
         throw new Error("チャンネルが選択されていません");
       }
 
-      const messageCount = 10; // デフォルトで最新10件を要約
+      const messageCount = 10;
 
-      // 処理中メッセージを送信
-      await client.chat.postEphemeral({
+      const loadingMessage = await client.chat.postEphemeral({
         channel: channelId,
         user: body.user.id,
         text: "📝 チャンネルの要約を作成しています...",
@@ -87,6 +86,13 @@ export const viewChannelSelectModal = async (app: App) => {
           },
         ],
       });
+      if (loadingMessage.message_ts) {
+        await client.chat.delete({
+          channel: channelId,
+          ts: loadingMessage.message_ts,
+          token: body.token,
+        });
+      }
     } catch (error) {
       console.error("チャンネル要約エラー:", error);
       const selectedChannelId =
