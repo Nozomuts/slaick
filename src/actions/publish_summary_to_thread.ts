@@ -1,18 +1,14 @@
-import { App } from "@slack/bolt";
+import { App, BlockAction } from "@slack/bolt";
 import { postSummaryToThread } from "../services/slack";
 
 export const actionPublishSummaryToThread = async (app: App) => {
-  app.action(
+  app.action<BlockAction>(
     "publish_summary_to_thread",
     async ({ ack, body, client, respond }) => {
       await ack();
 
       try {
-        if (
-          !("actions" in body) ||
-          !body.actions ||
-          body.actions.length === 0
-        ) {
+        if (body.actions.length === 0) {
           throw new Error("アクションデータが見つかりません");
         }
         const action = body.actions[0];
@@ -65,6 +61,12 @@ export const actionPublishSummaryToThread = async (app: App) => {
             replace_original: false,
           });
         }
+      }
+      if (body.container?.message_ts && body.channel?.id) {
+        await client.chat.delete({
+          channel: body.channel.id,
+          ts: body.container.message_ts,
+        });
       }
     }
   );

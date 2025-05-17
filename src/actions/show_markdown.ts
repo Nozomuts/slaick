@@ -1,147 +1,156 @@
-import { App } from "@slack/bolt";
+import { App, BlockAction } from "@slack/bolt";
 import { generateMarkdown } from "../services/markdown";
 import { uploadMarkdownFile } from "../services/slack";
 
 export const actionShowMarkdown = async (app: App) => {
-  app.action("show_markdown", async ({ ack, body, client, respond }) => {
-    await ack();
+  app.action<BlockAction>(
+    "show_markdown",
+    async ({ ack, body, client, respond }) => {
+      await ack();
 
-    try {
-      if (!("actions" in body) || !body.actions || body.actions.length === 0) {
-        throw new Error("アクションデータが見つかりません");
-      }
-      const action = body.actions[0];
-      if (action.type !== "button" || !action.value) {
-        throw new Error("要約データが見つかりません");
-      }
+      try {
+        if (body.actions.length === 0) {
+          throw new Error("アクションデータが見つかりません");
+        }
+        const action = body.actions[0];
+        if (action.type !== "button" || !action.value) {
+          throw new Error("要約データが見つかりません");
+        }
 
-      const [channelId, threadTs, encodedSummary] = action.value.split(":");
-      const summary = decodeURIComponent(encodedSummary);
+        const [channelId, threadTs, encodedSummary] = action.value.split(":");
+        const summary = decodeURIComponent(encodedSummary);
 
-      const markdown = await generateMarkdown(
-        client,
-        channelId,
-        threadTs,
-        summary
-      );
+        const markdown = await generateMarkdown(
+          client,
+          channelId,
+          threadTs,
+          summary
+        );
 
-      const fileUrl = await uploadMarkdownFile(
-        client,
-        body.channel?.id || channelId,
-        markdown,
-        `thread_summary_${Date.now()}.md`,
-        "スレッド要約"
-      );
+        const fileUrl = await uploadMarkdownFile(
+          client,
+          body.channel?.id || channelId,
+          markdown,
+          `thread_summary_${Date.now()}.md`,
+          "スレッド要約"
+        );
 
-      // マークダウンをコードブロックとして表示し、ダウンロードリンクを提供
-      if (body.channel?.id) {
-        await client.chat.update({
-          channel: body.channel.id,
-          ts: String(Date.now() / 1000),
-          text: "📝 Markdown形式の要約",
-          blocks: [
-            {
-              type: "section",
-              text: {
-                type: "mrkdwn",
-                text: "📝 *Markdown形式の要約*\n\nマークダウンファイルが作成されました。以下のリンクからダウンロードできます。",
-              },
-            },
-            {
-              type: "section",
-              text: {
-                type: "mrkdwn",
-                text: `<${fileUrl}|Markdownファイルをダウンロード>`,
-              },
-            },
-            {
-              type: "section",
-              text: {
-                type: "mrkdwn",
-                text:
-                  "プレビュー:\n```markdown\n" +
-                  markdown.substring(0, 500) +
-                  (markdown.length > 500 ? "...\n(省略)" : "") +
-                  "\n```",
-              },
-            },
-            {
-              type: "actions",
-              block_id: "markdown_actions",
-              elements: [
-                {
-                  type: "button",
-                  text: {
-                    type: "plain_text",
-                    text: "元の画面に戻る",
-                    emoji: true,
-                  },
-                  value: `${channelId}:${threadTs}:${encodeURIComponent(
-                    summary
-                  )}`,
-                  action_id: "back_to_summary",
+        // マークダウンをコードブロックとして表示し、ダウンロードリンクを提供
+        if (body.channel?.id) {
+          await client.chat.update({
+            channel: body.channel.id,
+            ts: String(Date.now() / 1000),
+            text: "📝 Markdown形式の要約",
+            blocks: [
+              {
+                type: "section",
+                text: {
+                  type: "mrkdwn",
+                  text: "📝 *Markdown形式の要約*\n\nマークダウンファイルが作成されました。以下のリンクからダウンロードできます。",
                 },
-              ],
-            },
-          ],
-        });
-      } else {
-        await respond({
-          text: `📝 Markdown形式の要約\n<${fileUrl}|Markdownファイルをダウンロード>`,
-          response_type: "ephemeral",
-          replace_original: false,
-        });
-      }
-    } catch (error) {
-      console.error("Markdown表示エラー:", error);
-      if (body.channel?.id) {
-        await client.chat.update({
-          channel: body.channel.id,
-          ts: (body as any).message.ts,
-          text: "❌ Markdown表示に失敗しました",
-          blocks: [
-            {
-              type: "section",
-              text: {
-                type: "mrkdwn",
-                text: `❌ Markdown表示に失敗しました: ${
-                  error instanceof Error ? error.message : "不明なエラー"
-                }`,
               },
-            },
-            {
-              type: "actions",
-              block_id: "markdown_error_actions",
-              elements: [
-                {
-                  type: "button",
-                  text: {
-                    type: "plain_text",
-                    text: "元の画面に戻る",
-                    emoji: true,
-                  },
-                  value:
-                    "actions" in body &&
-                    body.actions &&
-                    body.actions.length > 0 &&
-                    body.actions[0].type === "button"
-                      ? body.actions[0].value
-                      : undefined,
-                  action_id: "back_to_summary",
+              {
+                type: "section",
+                text: {
+                  type: "mrkdwn",
+                  text: `<${fileUrl}|Markdownファイルをダウンロード>`,
                 },
-              ],
-            },
-          ],
-        });
-      } else if ("respond" in body && typeof respond === "function") {
-        await respond({
-          text: `❌ Markdown表示に失敗しました: ${
-            error instanceof Error ? error.message : "不明なエラー"
-          }`,
-          response_type: "ephemeral",
-          replace_original: false,
+              },
+              {
+                type: "section",
+                text: {
+                  type: "mrkdwn",
+                  text:
+                    "プレビュー:\n```markdown\n" +
+                    markdown.substring(0, 500) +
+                    (markdown.length > 500 ? "...\n(省略)" : "") +
+                    "\n```",
+                },
+              },
+              {
+                type: "actions",
+                block_id: "markdown_actions",
+                elements: [
+                  {
+                    type: "button",
+                    text: {
+                      type: "plain_text",
+                      text: "元の画面に戻る",
+                      emoji: true,
+                    },
+                    value: `${channelId}:${threadTs}:${encodeURIComponent(
+                      summary
+                    )}`,
+                    action_id: "back_to_summary",
+                  },
+                ],
+              },
+            ],
+          });
+        } else {
+          await respond({
+            text: `📝 Markdown形式の要約\n<${fileUrl}|Markdownファイルをダウンロード>`,
+            response_type: "ephemeral",
+            replace_original: false,
+          });
+        }
+      } catch (error) {
+        console.error("Markdown表示エラー:", error);
+        if (body.channel?.id) {
+          await client.chat.update({
+            channel: body.channel.id,
+            ts: (body as any).message.ts,
+            text: "❌ Markdown表示に失敗しました",
+            blocks: [
+              {
+                type: "section",
+                text: {
+                  type: "mrkdwn",
+                  text: `❌ Markdown表示に失敗しました: ${
+                    error instanceof Error ? error.message : "不明なエラー"
+                  }`,
+                },
+              },
+              {
+                type: "actions",
+                block_id: "markdown_error_actions",
+                elements: [
+                  {
+                    type: "button",
+                    text: {
+                      type: "plain_text",
+                      text: "元の画面に戻る",
+                      emoji: true,
+                    },
+                    value:
+                      "actions" in body &&
+                      body.actions &&
+                      body.actions.length > 0 &&
+                      body.actions[0].type === "button"
+                        ? body.actions[0].value
+                        : undefined,
+                    action_id: "back_to_summary",
+                  },
+                ],
+              },
+            ],
+          });
+        } else if ("respond" in body && typeof respond === "function") {
+          await respond({
+            text: `❌ Markdown表示に失敗しました: ${
+              error instanceof Error ? error.message : "不明なエラー"
+            }`,
+            response_type: "ephemeral",
+            replace_original: false,
+          });
+        }
+      }
+      if (body.container?.message_ts && body.channel?.id) {
+        await client.chat.delete({
+          channel: body.channel.id,
+          ts: body.container.message_ts,
         });
       }
     }
-  });
+  );
 };
