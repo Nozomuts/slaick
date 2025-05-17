@@ -3,7 +3,6 @@ import {
   generateChannelMarkdown,
   generateThreadMarkdown,
 } from "../services/markdown";
-import { uploadMarkdownFile } from "../services/slack";
 import { initialize } from "../utils";
 
 export const actionShowMarkdown = async (app: App) => {
@@ -13,51 +12,35 @@ export const actionShowMarkdown = async (app: App) => {
     const params = initialize(body);
 
     try {
-      let markdown, fileUrl: string;
-      if (params.type === "channel") {
-        markdown = await generateChannelMarkdown(
-          client,
-          params.channelId,
-          params.summary,
-          params.messageCount
-        );
-        fileUrl = await uploadMarkdownFile(client, {
-          channel_id: params.channelId,
-          content: markdown,
-          filename: `channel_summary_${Date.now()}.md`,
-          title: "チャンネル要約",
-        });
-      } else {
-        markdown = await generateThreadMarkdown(
-          client,
-          params.channelId,
-          params.threadTs,
-          params.summary
-        );
-
-        fileUrl = await uploadMarkdownFile(client, {
-          channel_id: params.channelId,
-          content: markdown,
-          filename: `thread_summary_${Date.now()}.md`,
-          thread_ts: params.threadTs,
-          title: "スレッド要約",
-        });
-      }
+      const markdown =
+        params.type === "channel"
+          ? await generateChannelMarkdown(
+              client,
+              params.channelId,
+              params.summary,
+              params.messageCount
+            )
+          : await generateThreadMarkdown(
+              client,
+              params.channelId,
+              params.summary,
+              params.threadTs
+            );
 
       await client.chat.postEphemeral({
         channel: params.channelId,
         user: body.user.id,
         thread_ts: params.threadTs,
-        text: `📝 Markdown形式の要約\n<${fileUrl}|Markdownファイルをダウンロード>`,
+        text: "Markdown形式の要約",
         blocks: [
           {
             type: "section",
             text: {
               type: "mrkdwn",
               text:
-                "プレビュー:\n```markdown\n" +
-                markdown.substring(0, 500) +
-                (markdown.length > 500 ? "...\n(省略)" : "") +
+                "```\n" +
+                markdown.substring(0, 2000) +
+                (markdown.length > 2000 ? "...\n(省略)" : "") +
                 "\n```",
             },
           },

@@ -16,10 +16,11 @@ export const shortcutSummarizeThread = async (app: App) => {
     const userId = shortcut.user.id;
 
     try {
-      const loadingMessage = await client.chat.postEphemeral({
+      await client.chat.postEphemeral({
         channel: channelId,
+        thread_ts: messageTs,
         user: userId,
-        text: "📝 チャンネルの要約を作成しています...",
+        text: "📝 スレッドの要約を作成しています...",
       });
 
       const threadText = await getThreadMessages(client, channelId, messageTs);
@@ -84,12 +85,6 @@ export const shortcutSummarizeThread = async (app: App) => {
           },
         ],
       });
-      if (loadingMessage.message_ts) {
-        await client.chat.delete({
-          channel: channelId,
-          ts: loadingMessage.message_ts,
-        });
-      }
     } catch (error) {
       console.error("スレッド要約ショートカットエラー:", error);
       await client.chat.postEphemeral({

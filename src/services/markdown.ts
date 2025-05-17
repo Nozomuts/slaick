@@ -6,8 +6,8 @@ import { WebClient } from "@slack/web-api";
 export const generateThreadMarkdown = async (
   client: WebClient,
   channelId: string,
-  threadTs: string,
-  summary: string
+  summary: string,
+  threadTs: string
 ): Promise<string> => {
   try {
     // チャンネル情報の取得
@@ -109,7 +109,6 @@ export const generateChannelMarkdown = async (
 - **URL**: ${channelUrl}
 - **エクスポート日時**: ${formattedDate}
 
-## 要約
 ${summary}
 
 ---

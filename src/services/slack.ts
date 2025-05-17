@@ -1,4 +1,4 @@
-import { FilesUploadV2Arguments, WebClient } from "@slack/web-api";
+import { WebClient } from "@slack/web-api";
 import { SummaryVisibility } from "../types";
 
 export const getThreadMessages = async (
@@ -165,28 +165,5 @@ export const postChannelSummary = async (
   } catch (error) {
     console.error("メッセージ投稿エラー:", error);
     throw new Error("要約の投稿中にエラーが発生しました");
-  }
-};
-
-export const uploadMarkdownFile = async (
-  client: WebClient,
-  args: FilesUploadV2Arguments
-): Promise<string> => {
-  try {
-    const result = await client.filesUploadV2(args);
-
-    if (
-      !result.files ||
-      result.files.length === 0 ||
-      !result.files[0].files ||
-      result.files[0].files.length === 0
-    ) {
-      throw new Error("ファイルのアップロードに失敗しました");
-    }
-
-    return result.files[0].files[0].permalink || "";
-  } catch (error) {
-    console.error("ファイルアップロードエラー:", error);
-    throw new Error("ファイルのアップロード中にエラーが発生しました");
   }
 };

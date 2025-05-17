@@ -15,7 +15,7 @@ export const viewChannelSelectModal = async (app: App) => {
 
       const messageCount = 10;
 
-      const loadingMessage = await client.chat.postEphemeral({
+      await client.chat.postEphemeral({
         channel: channelId,
         user: body.user.id,
         text: "📝 チャンネルの要約を作成しています...",
@@ -86,13 +86,6 @@ export const viewChannelSelectModal = async (app: App) => {
           },
         ],
       });
-      if (loadingMessage.message_ts) {
-        await client.chat.delete({
-          channel: channelId,
-          ts: loadingMessage.message_ts,
-          token: body.token,
-        });
-      }
     } catch (error) {
       console.error("チャンネル要約エラー:", error);
       const selectedChannelId =
