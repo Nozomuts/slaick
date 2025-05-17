@@ -46,7 +46,7 @@ export const shortcutSummarizeThread = async (app: App) => {
                 value: `${channelId}:${messageTs}:${encodeURIComponent(
                   summary
                 )}`,
-                action_id: "publish_summary_to_thread",
+                action_id: "publish_summary",
               },
               {
                 type: "button",

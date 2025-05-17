@@ -57,7 +57,7 @@ export const viewChannelSelectModal = async (app: App) => {
                 value: `${channelId}:channel:${messageCount}:${encodeURIComponent(
                   summary
                 )}`,
-                action_id: "publish_channel_summary",
+                action_id: "publish_summary",
               },
               {
                 type: "button",
@@ -69,7 +69,7 @@ export const viewChannelSelectModal = async (app: App) => {
                 value: `${channelId}:channel:${messageCount}:${encodeURIComponent(
                   summary
                 )}`,
-                action_id: "export_channel_to_notion",
+                action_id: "export_to_notion",
               },
               {
                 type: "button",
@@ -81,7 +81,7 @@ export const viewChannelSelectModal = async (app: App) => {
                 value: `${channelId}:channel:${messageCount}:${encodeURIComponent(
                   summary
                 )}`,
-                action_id: "show_channel_markdown",
+                action_id: "show_markdown",
               },
             ],
           },

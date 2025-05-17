@@ -1,6 +1,6 @@
 import { App } from "@slack/bolt";
 import * as dotenv from "dotenv";
-import { actionPublishSummaryToThread } from "./actions/publish_summary_to_thread";
+import { actionPublishSummary } from "./actions/publish_summary";
 import { actionExportToNotion } from "./actions/export_to_notion";
 import { actionShowMarkdown } from "./actions/show_markdown";
 import { actionBackToSummary } from "./actions/back_to_summary";
@@ -20,7 +20,7 @@ const app = new App({
 shortcutSummarizeThread(app);
 shortcutSummarizeChannel(app);
 
-actionPublishSummaryToThread(app);
+actionPublishSummary(app);
 actionExportToNotion(app);
 actionShowMarkdown(app);
 actionBackToSummary(app);
