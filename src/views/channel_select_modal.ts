@@ -54,9 +54,9 @@ export const viewChannelSelectModal = async (app: App) => {
                   emoji: true,
                 },
                 style: "primary",
-                value: `${channelId}:channel:${messageCount}:${encodeURIComponent(
+                value: `channel:${channelId}:${encodeURIComponent(
                   summary
-                )}`,
+                )}:${messageCount}`,
                 action_id: "publish_summary",
               },
               {
@@ -66,9 +66,9 @@ export const viewChannelSelectModal = async (app: App) => {
                   text: "Notionにエクスポート",
                   emoji: true,
                 },
-                value: `${channelId}:channel:${messageCount}:${encodeURIComponent(
+                value: `channel:${channelId}:${encodeURIComponent(
                   summary
-                )}`,
+                )}:${messageCount}`,
                 action_id: "export_to_notion",
               },
               {
@@ -78,9 +78,9 @@ export const viewChannelSelectModal = async (app: App) => {
                   text: "Markdownで表示",
                   emoji: true,
                 },
-                value: `${channelId}:channel:${messageCount}:${encodeURIComponent(
+                value: `channel:${channelId}:${encodeURIComponent(
                   summary
-                )}`,
+                )}:${messageCount}`,
                 action_id: "show_markdown",
               },
             ],

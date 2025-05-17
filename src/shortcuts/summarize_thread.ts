@@ -44,9 +44,9 @@ export const shortcutSummarizeThread = async (app: App) => {
                   emoji: true,
                 },
                 style: "primary",
-                value: `${channelId}:${messageTs}:${encodeURIComponent(
+                value: `thread:${channelId}:${encodeURIComponent(
                   summary
-                )}`,
+                )}:${messageTs}`,
                 action_id: "publish_summary",
               },
               {
@@ -56,9 +56,9 @@ export const shortcutSummarizeThread = async (app: App) => {
                   text: "Notionにエクスポート",
                   emoji: true,
                 },
-                value: `${channelId}:${messageTs}:${encodeURIComponent(
+                value: `thread:${channelId}:${encodeURIComponent(
                   summary
-                )}`,
+                )}:${messageTs}`,
                 action_id: "export_to_notion",
               },
               {
@@ -68,9 +68,9 @@ export const shortcutSummarizeThread = async (app: App) => {
                   text: "Markdownで表示",
                   emoji: true,
                 },
-                value: `${channelId}:${messageTs}:${encodeURIComponent(
+                value: `thread:${channelId}:${encodeURIComponent(
                   summary
-                )}`,
+                )}:${messageTs}`,
                 action_id: "show_markdown",
               },
             ],

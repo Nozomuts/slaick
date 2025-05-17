@@ -1,47 +1,27 @@
 import { App, BlockAction } from "@slack/bolt";
 import { exportToNotion } from "../services/notion";
+import { initialize } from "../utils";
 
 export const actionExportToNotion = async (app: App) => {
   app.action<BlockAction>("export_to_notion", async ({ ack, body, client }) => {
     await ack();
 
-    if (body.actions.length === 0) {
-      throw new Error("アクションデータが見つかりません");
-    }
-    const action = body.actions[0];
-    if (action.type !== "button" || !action.value) {
-      throw new Error("要約データが見つかりません");
-    }
-    const [channelId, threadTs, encodedSummary] = action.value.split(":");
-    const summary = decodeURIComponent(encodedSummary);
+    const params = initialize(body);
 
     try {
       const channelInfo = await client.conversations.info({
-        channel: channelId,
+        channel: params.channelId,
       });
       const channelName = channelInfo.channel?.name || "チャンネル";
+      const title = `${channelName} スレッド要約: ${Date.now()}`;
+      const result = await exportToNotion(params.summary, { title });
 
-      const threadMessages = await client.conversations.replies({
-        channel: channelId,
-        ts: threadTs,
-        limit: 1,
-      });
-
-      const firstMessageText = threadMessages.messages?.[0]?.text || "";
-      const shortText =
-        firstMessageText.length > 30
-          ? firstMessageText.substring(0, 30) + "..."
-          : firstMessageText;
-
-      const title = `${channelName} スレッド要約: ${shortText}`;
-
-      const result = await exportToNotion(summary, { title });
-
-      if (channelId) {
+      if (params.type === "channel") {
         if (result.success) {
-          await client.chat.update({
-            channel: channelId,
-            ts: threadTs,
+          await client.chat.postEphemeral({
+            channel: params.channelId,
+            thread_ts: params.threadTs,
+            user: body.user.id,
             text: "✅ Notionへのエクスポートが完了しました",
             blocks: [
               {
@@ -61,9 +41,10 @@ export const actionExportToNotion = async (app: App) => {
             ],
           });
         } else {
-          await client.chat.update({
-            channel: channelId,
-            ts: threadTs,
+          await client.chat.postEphemeral({
+            channel: params.channelId,
+            thread_ts: params.threadTs,
+            user: body.user.id,
             text: "❌ Notionへのエクスポートに失敗しました",
             blocks: [
               {
@@ -78,7 +59,7 @@ export const actionExportToNotion = async (app: App) => {
         }
       } else {
         await client.chat.postEphemeral({
-          channel: channelId,
+          channel: params.channelId,
           user: body.user.id,
           text: result.success
             ? `✅ Notionへのエクスポートが完了しました: <${result.url}|Notionで開く>`
@@ -89,7 +70,7 @@ export const actionExportToNotion = async (app: App) => {
       console.error("Notionエクスポートエラー:", error);
       if (body.message) {
         await client.chat.update({
-          channel: channelId,
+          channel: params.channelId,
           ts: body.message.ts,
           text: `❌ Notionへのエクスポートに失敗しました: ${
             error instanceof Error ? error.message : "不明なエラー"
@@ -97,7 +78,7 @@ export const actionExportToNotion = async (app: App) => {
         });
       } else {
         await client.chat.postEphemeral({
-          channel: channelId,
+          channel: params.channelId,
           user: body.user.id,
           text: `❌ Notionへのエクスポートに失敗しました: ${
             error instanceof Error ? error.message : "不明なエラー"
