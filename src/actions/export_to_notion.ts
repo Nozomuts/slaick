@@ -12,8 +12,10 @@ export const actionExportToNotion = async (app: App) => {
       const channelInfo = await client.conversations.info({
         channel: params.channelId,
       });
-      const channelName = channelInfo.channel?.name || "チャンネル";
-      const title = `${channelName} スレッド要約: ${Date.now()}`;
+      const channelName = channelInfo.channel?.name || "不明なチャンネル";
+      const title = `${channelName} 要約: ${new Date().toLocaleString(
+        "ja-JP"
+      )}`;
       const result = await exportToNotion(params.summary, { title });
 
       if (params.type === "channel") {
