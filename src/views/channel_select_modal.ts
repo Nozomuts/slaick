@@ -22,17 +22,14 @@ export const viewChannelSelectModal = async (app: App) => {
         text: "📝 チャンネルの要約を作成しています...",
       });
 
-      // チャンネルのメッセージを取得
       const channelText = await getChannelMessages(
         client,
         channelId,
         messageCount
       );
 
-      // OpenRouterでチャンネルを要約
       const summary = await summarizeChannelContent(channelText, messageCount);
 
-      // エフェメラルメッセージとして要約を表示（ボタン付き）
       await client.chat.postEphemeral({
         channel: channelId,
         user: body.user.id,
@@ -42,7 +39,7 @@ export const viewChannelSelectModal = async (app: App) => {
             type: "section",
             text: {
               type: "mrkdwn",
-              text: `📝 *チャンネル要約が完了しました (最新${messageCount}件)*\n\n要約結果はあなただけに表示されています。チャンネルに公開することもできます。`,
+              text: `📝 *チャンネル要約が完了しました (最新${messageCount}件)*\n\n要約結果はあなただけに表示されています。チャンネルに公開することもできます。\n\n${summary}`,
             },
           },
           {

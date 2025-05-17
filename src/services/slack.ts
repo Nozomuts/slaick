@@ -58,7 +58,11 @@ export const getChannelMessages = async (
     // メッセージのユーザー名とテキストを連結
     const messageTexts = await Promise.all(
       result.messages
-        .filter((message) => message.text && (!message.subtype || message.subtype === 'bot_message')) // 通常のメッセージとボットメッセージのみ
+        .filter(
+          (message) =>
+            message.text &&
+            (!message.subtype || message.subtype === "bot_message")
+        ) // 通常のメッセージとボットメッセージのみ
         .map(async (message) => {
           let username = "不明なユーザー";
 
@@ -175,8 +179,7 @@ export const uploadMarkdownFile = async (
   title?: string
 ): Promise<string> => {
   try {
-    // ファイルをアップロード
-    const result = await client.files.upload({
+    const result = await client.filesUploadV2({
       channels: channelId,
       content: content,
       filename: fileName,
@@ -184,11 +187,16 @@ export const uploadMarkdownFile = async (
       title: title || fileName,
     });
 
-    if (!result.file?.permalink) {
+    if (
+      !result.files ||
+      result.files.length === 0 ||
+      !result.files[0].files ||
+      result.files[0].files.length === 0
+    ) {
       throw new Error("ファイルのアップロードに失敗しました");
     }
 
-    return result.file.permalink;
+    return result.files[0].files[0].permalink || "";
   } catch (error) {
     console.error("ファイルアップロードエラー:", error);
     throw new Error("ファイルのアップロード中にエラーが発生しました");

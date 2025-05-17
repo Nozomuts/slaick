@@ -28,7 +28,7 @@ export const shortcutSummarizeThread = async (app: App) => {
             type: "section",
             text: {
               type: "mrkdwn",
-              text: "📝 *スレッド要約が完了しました*\n\n要約結果はあなただけに表示されています。スレッドに公開することもできます。",
+              text: `📝 *スレッド要約が完了しました*\n\n要約結果はあなただけに表示されています。スレッドに公開することもできます。\n\n${summary}`,
             },
           },
           {
