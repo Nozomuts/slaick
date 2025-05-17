@@ -1,11 +1,6 @@
 import { Client } from "@notionhq/client";
 import { ExportResult, NotionExportOptions } from "../types";
 
-// Notionクライアントの初期化
-const notion = new Client({
-  auth: process.env.NOTION_API_KEY,
-});
-
 /**
  * スレッド要約をNotionにエクスポートする
  */
@@ -17,14 +12,17 @@ export const exportToNotion = async (
     if (!process.env.NOTION_API_KEY) {
       throw new Error("Notion APIキーが設定されていません");
     }
+    const notion = new Client({
+      auth: process.env.NOTION_API_KEY,
+    });
 
     const title =
       options.title || `Slack要約 ${new Date().toLocaleString("ja-JP")}`;
 
     const response = await notion.pages.create({
       parent: {
-        type: "page_id",
-        page_id: process.env.NOTION_DEFAULT_PAGE_ID || "",
+        type: "database_id",
+        database_id: process.env.NOTION_DATABASE_ID || "",
       },
       properties: {
         title: {
