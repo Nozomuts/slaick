@@ -60,6 +60,7 @@ export const actionExportToNotion = async (app: App) => {
       } else {
         await client.chat.postEphemeral({
           channel: params.channelId,
+          thread_ts: params.threadTs,
           user: body.user.id,
           text: result.success
             ? `✅ Notionへのエクスポートが完了しました: <${result.url}|Notionで開く>`
@@ -71,7 +72,7 @@ export const actionExportToNotion = async (app: App) => {
       if (body.message) {
         await client.chat.postEphemeral({
           channel: params.channelId,
-          thread_ts: body.message.ts,
+          thread_ts: params.threadTs,
           user: body.user.id,
           text: `❌ Notionへのエクスポートに失敗しました: ${
             error instanceof Error ? error.message : "不明なエラー"
@@ -80,6 +81,7 @@ export const actionExportToNotion = async (app: App) => {
       } else {
         await client.chat.postEphemeral({
           channel: params.channelId,
+          thread_ts: params.threadTs,
           user: body.user.id,
           text: `❌ Notionへのエクスポートに失敗しました: ${
             error instanceof Error ? error.message : "不明なエラー"
