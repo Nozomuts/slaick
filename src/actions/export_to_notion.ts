@@ -13,9 +13,14 @@ export const actionExportToNotion = async (app: App) => {
         channel: params.channelId,
       });
       const channelName = channelInfo.channel?.name || "不明なチャンネル";
-      const title = `${channelName} 要約: ${new Date().toLocaleString(
-        "ja-JP"
-      )}`;
+      const title = `${channelName} 要約: ${new Date().toLocaleString("ja-JP", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })}`;
       const result = await exportToNotion(params.summary, { title });
 
       if (params.type === "channel") {
