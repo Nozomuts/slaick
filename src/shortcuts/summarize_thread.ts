@@ -22,6 +22,7 @@ export const shortcutSummarizeThread = async (app: App) => {
       await client.chat.postEphemeral({
         channel: channelId,
         user: shortcut.user.id,
+        thread_ts: messageTs,
         text: "📝 スレッドの要約が完了しました（あなただけに表示されています）",
         blocks: [
           {

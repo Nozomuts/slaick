@@ -85,12 +85,6 @@ export const actionPublishSummary = async (app: App) => {
           });
         }
       }
-      if (body.container?.message_ts && body.channel?.id) {
-        await client.chat.delete({
-          channel: body.channel.id,
-          ts: body.container.message_ts,
-        });
-      }
     }
   );
 };

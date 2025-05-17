@@ -48,10 +48,10 @@ export const actionShowMarkdown = async (app: App) => {
 
         // マークダウンをコードブロックとして表示し、ダウンロードリンクを提供
         if (body.channel?.id) {
-          await client.chat.update({
+          await client.chat.postMessage({
             channel: body.channel.id,
-            ts: String(Date.now() / 1000),
             text: "📝 Markdown形式の要約",
+            ...(!isChannel && { thread_ts: threadTs }),
             blocks: [
               {
                 type: "section",
@@ -166,12 +166,6 @@ export const actionShowMarkdown = async (app: App) => {
             replace_original: false,
           });
         }
-      }
-      if (body.container?.message_ts && body.channel?.id) {
-        await client.chat.delete({
-          channel: body.channel.id,
-          ts: body.container.message_ts,
-        });
       }
     }
   );
