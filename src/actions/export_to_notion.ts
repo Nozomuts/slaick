@@ -69,9 +69,10 @@ export const actionExportToNotion = async (app: App) => {
     } catch (error) {
       console.error("Notionエクスポートエラー:", error);
       if (body.message) {
-        await client.chat.update({
+        await client.chat.postEphemeral({
           channel: params.channelId,
-          ts: body.message.ts,
+          thread_ts: body.message.ts,
+          user: body.user.id,
           text: `❌ Notionへのエクスポートに失敗しました: ${
             error instanceof Error ? error.message : "不明なエラー"
           }`,
