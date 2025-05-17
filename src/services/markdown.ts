@@ -64,14 +64,7 @@ ${summary}
   } catch (error) {
     console.error("マークダウン生成エラー:", error);
     // 基本的なマークダウンにフォールバック
-    return `# スレッド要約
-
-${summary}
-
----
-
-*自動生成された要約です*
-`;
+    return "";
   }
 };
 
@@ -126,13 +119,6 @@ ${summary}
   } catch (error) {
     console.error("マークダウン生成エラー:", error);
     // 基本的なマークダウンにフォールバック
-    return `# チャンネル要約 (最新${messageCount}件)
-
-${summary}
-
----
-
-*自動生成された要約です*
-`;
+    return "";
   }
 };

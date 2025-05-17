@@ -1,6 +1,6 @@
 import { App } from "@slack/bolt";
 import { getChannelMessages } from "../services/slack";
-import { summarizeChannelContent } from "../services/openRouter";
+import { summarizeChannel } from "../services/openRouter";
 
 export const viewChannelSelectModal = async (app: App) => {
   app.view("channel_select_modal", async ({ ack, body, view, client }) => {
@@ -28,7 +28,7 @@ export const viewChannelSelectModal = async (app: App) => {
         messageCount
       );
 
-      const summary = await summarizeChannelContent(channelText, messageCount);
+      const summary = await summarizeChannel(channelText, messageCount);
 
       await client.chat.postEphemeral({
         channel: channelId,
