@@ -6,7 +6,6 @@ export const actionExportToNotion = async (app: App) => {
     await ack();
 
     try {
-      // bodyがBlockActionPayloadであることを確認
       if (!("actions" in body) || !body.actions || body.actions.length === 0) {
         throw new Error("アクションデータが見つかりません");
       }
@@ -14,19 +13,14 @@ export const actionExportToNotion = async (app: App) => {
       if (action.type !== "button" || !action.value) {
         throw new Error("要約データが見つかりません");
       }
-      const value = action.value;
-
-      // 値からチャンネルID、スレッドTS、要約テキストを取得
-      const [channelId, threadTs, encodedSummary] = value.split(":");
+      const [channelId, threadTs, encodedSummary] = action.value.split(":");
       const summary = decodeURIComponent(encodedSummary);
 
-      // チャンネル名を取得（タイトルに使用）
       const channelInfo = await client.conversations.info({
         channel: channelId,
       });
       const channelName = channelInfo.channel?.name || "チャンネル";
 
-      // スレッドの最初のメッセージを取得してタイトルに使用
       const threadMessages = await client.conversations.replies({
         channel: channelId,
         ts: threadTs,
@@ -39,15 +33,12 @@ export const actionExportToNotion = async (app: App) => {
           ? firstMessageText.substring(0, 30) + "..."
           : firstMessageText;
 
-      // タイトルを作成
       const title = `${channelName} スレッド要約: ${shortText}`;
 
-      // Notionにエクスポート
       const result = await exportToNotion(summary, { title });
 
       if (body.channel?.id) {
         if (result.success) {
-          // 成功メッセージ
           await client.chat.update({
             channel: body.channel.id,
             ts: String(Date.now() / 1000),
@@ -70,7 +61,6 @@ export const actionExportToNotion = async (app: App) => {
             ],
           });
         } else {
-          // エラーメッセージ
           await client.chat.update({
             channel: body.channel.id,
             ts: String(Date.now() / 1000),

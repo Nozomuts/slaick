@@ -5,7 +5,6 @@ export const actionBackToSummary = async (app: App) => {
     await ack();
 
     try {
-      // bodyがBlockActionPayloadであることを確認
       if (!("actions" in body) || !body.actions || body.actions.length === 0) {
         throw new Error("アクションデータが見つかりません");
       }
@@ -15,10 +14,8 @@ export const actionBackToSummary = async (app: App) => {
       }
       const value = action.value;
 
-      // 値からチャンネルID、スレッドTS、要約テキストを取得
       const [channelId, threadTsOrMarker, ...rest] = value.split(":");
       const encodedSummary = rest.pop() || "";
-      const summary = decodeURIComponent(encodedSummary);
       const messageCountOrThreadTs = rest.join(":") || threadTsOrMarker;
 
       if (!body.channel?.id) {
@@ -30,11 +27,9 @@ export const actionBackToSummary = async (app: App) => {
         return;
       }
 
-      // threadTsが"channel"で始まる場合はチャンネル要約、そうでなければスレッド要約
       if (threadTsOrMarker === "channel") {
         const messageCount = parseInt(messageCountOrThreadTs);
 
-        // 元のチャンネル要約画面に戻す
         await client.chat.update({
           channel: body.channel.id,
           ts: String(Date.now() / 1000),
@@ -87,7 +82,6 @@ export const actionBackToSummary = async (app: App) => {
           ],
         });
       } else {
-        // 元のスレッド要約画面に戻す
         const threadTs = messageCountOrThreadTs;
         await client.chat.update({
           channel: body.channel.id,

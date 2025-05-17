@@ -5,7 +5,6 @@ export const shortcutSummarizeChannel = async (app: App) => {
     await ack();
 
     try {
-      // チャンネル選択モーダルを表示
       await client.views.open({
         trigger_id: shortcut.trigger_id,
         view: {

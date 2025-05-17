@@ -7,7 +7,6 @@ export const actionShowMarkdown = async (app: App) => {
     await ack();
 
     try {
-      // bodyがBlockActionPayloadであることを確認
       if (!("actions" in body) || !body.actions || body.actions.length === 0) {
         throw new Error("アクションデータが見つかりません");
       }
@@ -15,13 +14,10 @@ export const actionShowMarkdown = async (app: App) => {
       if (action.type !== "button" || !action.value) {
         throw new Error("要約データが見つかりません");
       }
-      const value = action.value;
 
-      // 値からチャンネルID、スレッドTS、要約テキストを取得
-      const [channelId, threadTs, encodedSummary] = value.split(":");
+      const [channelId, threadTs, encodedSummary] = action.value.split(":");
       const summary = decodeURIComponent(encodedSummary);
 
-      // マークダウンを生成
       const markdown = await generateMarkdown(
         client,
         channelId,
@@ -29,25 +25,11 @@ export const actionShowMarkdown = async (app: App) => {
         summary
       );
 
-      // チャンネル名を取得（ファイル名に使用）
-      const channelInfo = await client.conversations.info({
-        channel: channelId,
-      });
-      const channelName = channelInfo.channel?.name || "channel";
-
-      // 日付を取得（ファイル名に使用）
-      const now = new Date();
-      const dateStr = now.toISOString().substring(0, 10).replace(/-/g, "");
-
-      // ファイル名を作成
-      const fileName = `${channelName}_thread_summary_${dateStr}.md`;
-
-      // マークダウンファイルをSlackにアップロード
       const fileUrl = await uploadMarkdownFile(
         client,
         body.channel?.id || channelId,
         markdown,
-        fileName,
+        `thread_summary_${Date.now()}.md`,
         "スレッド要約"
       );
 
@@ -69,7 +51,7 @@ export const actionShowMarkdown = async (app: App) => {
               type: "section",
               text: {
                 type: "mrkdwn",
-                text: `<${fileUrl}|${fileName} をダウンロード>`,
+                text: `<${fileUrl}|Markdownファイルをダウンロード>`,
               },
             },
             {
@@ -105,7 +87,7 @@ export const actionShowMarkdown = async (app: App) => {
         });
       } else {
         await respond({
-          text: `📝 Markdown形式の要約\n<${fileUrl}|${fileName} をダウンロード>`,
+          text: `📝 Markdown形式の要約\n<${fileUrl}|Markdownファイルをダウンロード>`,
           response_type: "ephemeral",
           replace_original: false,
         });

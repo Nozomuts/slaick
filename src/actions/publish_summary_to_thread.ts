@@ -8,7 +8,6 @@ export const actionPublishSummaryToThread = async (app: App) => {
       await ack();
 
       try {
-        // bodyがBlockActionPayloadであることを確認
         if (
           !("actions" in body) ||
           !body.actions ||
@@ -20,13 +19,10 @@ export const actionPublishSummaryToThread = async (app: App) => {
         if (action.type !== "button" || !action.value) {
           throw new Error("要約データが見つかりません");
         }
-        const value = action.value;
 
-        // 値からチャンネルID、スレッドTS、要約テキストを取得
-        const [channelId, threadTs, encodedSummary] = value.split(":");
+        const [channelId, threadTs, encodedSummary] = action.value.split(":");
         const summary = decodeURIComponent(encodedSummary);
 
-        // スレッドに公開として投稿
         await postSummaryToThread(
           client,
           channelId,
@@ -35,7 +31,6 @@ export const actionPublishSummaryToThread = async (app: App) => {
           "public"
         );
 
-        // 確認メッセージを送信
         if (body.channel?.id && "message" in body && body.message?.ts) {
           await client.chat.update({
             channel: body.channel.id,
