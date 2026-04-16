@@ -16,7 +16,7 @@ SlackのスレッドやチャンネルをAIで要約するSlackボットです�
 ```
 SLACK_SIGNING_SECRET=  # Slackアプリの署名シークレット
 SLACK_BOT_TOKEN=       # SlackボットのOAuthトークン
-SLACK_APP_TOKEN=       # SlackアプリレベルトークN（ソケットモード用）
+SLACK_APP_TOKEN=       # Slackアプリレベルトークン（ソケットモード用）
 OPENROUTER_API_KEY=    # OpenRouter APIキー
 NOTION_API_KEY=        # Notion APIキー（Notionエクスポートを使う場合）
 NOTION_DATABASE_ID=    # NotionデータベースID（Notionエクスポートを使う場合）
